@@ -1,5 +1,5 @@
 import numpy as np
-from netCDF4 import Dataset
+from data_collection import Input, Output
 import datetime
 #Initialization
 
@@ -196,22 +196,6 @@ def p_moist():
 	global p0, Ddry
 	pressure = p0*(Rd*tp_moist()/p0/Ddry)^gamma()
 	return pressure 
-
-#IO
-def Input(name, t):
-	time =  Dataset("%s.nc"%var, "r")["time"][:]
-	for i in range(0,len(time)):
-		if t == time[i]:
-			Var = Dataset("%s.nc"%var, "r+")[var]
-	return Var
-
-def Output(name, var, t):
-	global nX, nY
-	if "%s.nc"%name not in os.listdir(os.getcwd()):
-		f = Dataset("%s.nc"%name, "w")
-		
-	elif "%s.nc"%name in os.listdir(os.getcwd()):
-		f = Dataset("%s.nc"%name, "a")
 
 
 #level identification
