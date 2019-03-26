@@ -6,8 +6,9 @@ from netCDF4 import Dataset
 class DataCollection:
     def __init__(self, data=None):
         self._data = data
+
     def collect(self):
-        return
+        raise NotImplementedError("not implemeted")
 
     def readFile(self):
         raise NotImplementedError("not implemeted")
@@ -19,12 +20,10 @@ class AirDynamicData(DataCollection):
     def __init__(self, name):
         data = Dataset("%s.nc"%name, "r")
         super().__init__(data)
+        self._time_map = self.prepare(data)
         
     def air_collect(self, name, time):
-        timezone = self._data["time"][:]
-        for i in range(0, len(timezone)):
-            if timezone[i] == time:
-                return self._data[name][i].filled()
+        return self._data[name][self._time_map[time]].filled()
 
     def collect(self, name, time):
         return self.air_collect(name, time)
@@ -37,5 +36,13 @@ class AirDynamicData(DataCollection):
             f = Dataset("%s.nc"%name, "w")
         elif "%s.nc"%name in os.listdir(os.getcwd()):
             f = Dataset("%s.nc"%name, "a")
+    
+    def prepare(self, data):
+        timezone = data["time"][:]
+        time_map = {}
+        for i in range(0, len(timezone)):
+            time_map[timezone[i]] = i
+        return time_map
+
     
    
