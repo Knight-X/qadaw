@@ -1,5 +1,5 @@
 import numpy as np
-from data_collection import Input, Output
+from data_collection import AirDynamicData
 import datetime
 #Initialization
 
@@ -42,57 +42,22 @@ MW_wv = "molecular weight of water vapor"
 MW_dry = "molecular weight of dry air"
 epcilon = MW_wv/MW_dry
 
-u = Input("u", t_now), v = Input("v", t_now), w = Input("w", t_now),o = Input("o", t_now),
-tp = Input("tp",t_now),  gp = Input("gp", t_now),
-qv = Input("qv", t_now), qc = Input("qc", t_now), qr = Input("qr", t_now), qi = Input("qi", t_now)
-qm = qv+qc+qr+qi
-D = Ddry()/(1+qm)
+data_collector = AirDynamicData("climate2014-01.nc")
+
+u = None, v = None, w = None,o = None,
+tp = None,  gp = None,
+qv = None, qc = None, qr = None, qi = None,
+qm = None
+D = None
+
+
 
 "Remember to revise U,V mapFactor in and Mdry during acoustic step"
-U = coupled(u), V = coupled(v), W = coupled(w), O = coupled(o), Tp = coupled(tp),
-Qv = coupled(qv), Qc = coupled(qc), Qr = coupled(qr), Qi = coupled(qi), Qm = coupled(qm)
+U = None
+V = None, W = None, O = None, Tp = None,
+Qv = None, Qc = None, Qr = None, Qi = None, Qm = None
 
-#Runge-Kutta Step	main-loop
-def main():
-	for t in range(0, (t_end-t_start)/Step): 
-		t_now = t_start + t*Step
-			
-		for i in range(3,0,-1):
-			RK3_start = t_now
 
-			if i == 3:
-				n = 1, Step_acoustic = Step_RK3/3
-
-				U_tend = Adv("U")+Fcor("U")
-				V_tend = Adv("V")+Fcor("V")
-				W_tend = Adv("W")+Fcor("W")
-				Tp_tend = Adv("Tp")+Fcor("Tp")
-				gp_tend = Adv("gp")+Fcor("gp")
-				Mdry_tend = Adv("Mdry")+Fcor("Mdry")
-				
-			else:
-				n = ns/i, Step_acoustic = Step_RK3/ns
-
-			var_S = (
-					ModeS("U", U_tend),
-					ModeS("V", V_tend),
-					ModeS("W", W_tend),
-					ModeS("Mdry", Mdry_tend),
-					ModeS("Tp", Tp_tend),
-					ModeS("gp", gp_tend)
-					)
-
-			acoustic_time_integration(var_S, n, RK3_start, Step_acoustic)
-
-			Qm_tend = - mapFactorX*mapFactorY*(Spatial(timeAvg("U", acoustic_start, Step_acoustic*n)*Interp(qm, 2), 2) + Spatial(timeAvg("V", acoustic_start, Step_acoustic*n)*Interp(qm, 1), 1)) - mapFactorY*Spatial(timeAvg("O", acoustic_start, Step_acoustic*n)*Interp(qm, 0), 0)
-			Qm_advanced = Input("Qm", RK3_start) + Step_RK3*Qm_tend
-
-			p = p_moist()
-			gp_perturb_from_refer_grad = -(Mdry_reference()*Ddry_perturb_from_refer()+Mdry*Ddry_reference())
-
-			Output("Qm", Qm_advanced, RK3_start + n*Step_acoustic)
-			Output("p", p, RK3_start + n*Step_acoustic)
-			Output("Ddry", Ddry, RK3_start + n*Step_acoustic)
 
 
 #reference state
@@ -197,7 +162,6 @@ def p_moist():
 	pressure = p0*(Rd*tp_moist()/p0/Ddry)^gamma()
 	return pressure 
 
-
 #level identification
 def level_determine(var):
 	global nX, nY, nK
@@ -212,6 +176,24 @@ def level_determine(var):
 			lvl = "w"
 	
 	return lvl
+
+def Interp(var, axis):#x is supposed to be a tuple
+	global wdK
+	if level_determine(var) == "mp":
+		wd_forward = np.concatenate((wd[axis], bc), axis)
+		wd_backward = np.concatenate((bc, wd[axis]), axis)
+		
+		var_forward = np.concatenate((var, bc), axis)
+		var_backward = np.concatenate((bc, var), axis)
+		
+		Var = 0.5*(wd_backward/(0.5*(wd_backward + wd_forward))*var_forward + wd_forward/(0.5*(wd_backward + wd_forward))*var_backward)
+	else:
+		var_forward = var.take(np.arange(1, var.shape[axis]), axis)
+		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
+		
+		Var = 0.5*(var_forward + var_backward)	
+	
+	return Var
 
 #import variable and turn it to coupled form
 def coupled(var):# a is any variable
@@ -246,28 +228,11 @@ def uncoupled(Var):
 #Operator
 def timeAvg(name, var_advanced, start, Step):
 	global Beta
-	var_prev = Input(name, start - step)
+	var_prev = data_collector.collect(name, start - step)
 	var_timeAvg = (1+Beta)/2*var_advanced+(1-Beta)/2*var_prev
 
 	return var_timeAvg
 
-def Interp(var, axis):#x is supposed to be a tuple
-	global wdK
-	if level_determine(var) == "mp":
-		wd_forward = np.concatenate((wd[axis], bc), axis)
-		wd_backward = np.concatenate((bc, wd[axis]), axis)
-		
-		var_forward = np.concatenate((var, bc), axis)
-		var_backward = np.concatenate((bc, var), axis)
-		
-		Var = 0.5*(wd_backward/(0.5*(wd_backward + wd_forward))*var_forward + wd_forward/(0.5*(wd_backward + wd_forward))*var_backward)
-	else:
-		var_forward = var.take(np.arange(1, var.shape[axis]), axis)
-		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
-		
-		Var = 0.5*(var_forward + var_backward)	
-	
-	return Var
 
 def Spatial(var, axis):#axis option (x,y)
 	global wdX, wdY, BC
@@ -407,29 +372,29 @@ def ModeF(var, acoustic_start):
 	global mapFactorX, mapFactorY, U, V, O, gp, D
 
 	if var == "U":
-		F = Interp(M,2)*Interp(D,2)*Spatial(Input(p_perturb, acoustic_start), 2)
-		  + (Interp(M,2)*Spatial(p_reference(),2)*Interp(Input(D_perturb, acoustic_start),2))
+		F = Interp(M,2)*Interp(D,2)*Spatial(data_collector.collect(p_perturb, acoustic_start), 2)
+		  + (Interp(M,2)*Spatial(p_reference(),2)*Interp(data_collector.collect(D_perturb, acoustic_start),2))
 		  + Interp(D/Ddry, 2)*
 		  (
-		  	Interp(M,2)*Spatial(Interp(Input(gp_perturb, acoustic_start), 0),2)
+		  	Interp(M,2)*Spatial(Interp(data_collector.collect(gp_perturb, acoustic_start), 0),2)
 		  	+ Spatial(Interp(gp, 0),2)*
 		  	(
-		  		Spatial(Interp(Interp(Input(p_perturb, acoustic_start),0),2),0)
-		  		-Interp(Input(M_perturb ,acoustic_start),2)
+		  		Spatial(Interp(Interp(data_collector.collect(p_perturb, acoustic_start),0),2),0)
+		  		-Interp(data_collector.collect(M_perturb ,acoustic_start),2)
 		  		)
 
 		  	)
 
 	elif var == "V":
-		F = Interp(M,1)*Interp(D,1)*Spatial(Input(p_perturb, acoustic_start),1)
-		  + (Interp(M,1)*Spatial(p_reference(),1)*Interp(Input(D_perturb, acoustic_start),1))
+		F = Interp(M,1)*Interp(D,1)*Spatial(data_collector.collect(p_perturb, acoustic_start),1)
+		  + (Interp(M,1)*Spatial(p_reference(),1)*Interp(data_collector.collect(D_perturb, acoustic_start),1))
 		  + Interp(D/Ddry, 1)*
 		  (
-		  	Interp(M,1)*Spatial(Interp(Input(gp_perturb, acoustic_start), 0),1)
+		  	Interp(M,1)*Spatial(Interp(data_collector.collect(gp_perturb, acoustic_start), 0),1)
 		  	+Spatial(Interp(gp, 0),1)*
 		  	(
-		  		Spatial(Interp(Interp(Input(p_perturb, acoustic_start),0),1),0)
-		  		-Interp(Input(M_perturb,acoustic_start),1)
+		  		Spatial(Interp(Interp(data_collector.collect(p_perturb, acoustic_start),0),1),0)
+		  		-Interp(data_collector.collect(M_perturb,acoustic_start),1)
 		  		)
 		  	)
 
@@ -443,12 +408,12 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	
 	acoustic_start = RK3_start 
 	
-	U_perturb = U - Input("U", acoustic_start)
-	V_perturb = V - Input("V", acoustic_start)
-	W_perturb = W - Input("W", acoustic_start)
-	Mdry_perturb = Mdry - Input("Mdry", acoustic_start)
-	Tp_perturb = Tp - Input("Tp", acoustic_start)
-	gp_perturb = gp - Input("gp", acoustic_start)
+	U_perturb = U - data_collector.collect("U", acoustic_start)
+	V_perturb = V - data_collector.collect("V", acoustic_start)
+	W_perturb = W - data_collector.collect("W", acoustic_start)
+	Mdry_perturb = Mdry - data_collector.collect("Mdry", acoustic_start)
+	Tp_perturb = Tp - data_collector.collect("Tp", acoustic_start)
+	gp_perturb = gp - data_collector.collect("gp", acoustic_start)
 
 	for j in range(0, n):
 		U_perturb = U_perturb + Step_acoustic*( U_S - ModeF("U",acoustic_start))
@@ -491,3 +456,68 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	Output("Tp", uncouple(Tp_perturb+Tp), acoustic_end)
 	Output("gp", gp_perturb+gp, acoustic_end)
 
+def prepare():
+	u = data_collector.collect("u", t_now)
+	v = data_collector.collect("v", t_now)
+	w = data_collector.collect("w", t_now)
+	o = data_collector.collect("o", t_now)
+	tp = data_collector.collect("tp",t_now)
+	gp = data_collector.collect("gp", t_now)	
+	qv = data_collector.collect("qv", t_now)
+	qc = data_collector.collect("qc", t_now)
+	qr = data_collector.collect("qr", t_now) 
+	qi = data_collector.collect("qi", t_now)
+	qm = qv+qc+qr+qi
+	D = Ddry()/(1+qm)
+	U = coupled(u)
+	V = coupled(v)
+	W = coupled(w)
+	O = coupled(o)
+	Tp = coupled(tp)
+	Qv = coupled(qv)
+	Qc = coupled(qc) 
+	Qr = coupled(qr) 
+	Qi = coupled(qi)
+	Qm = coupled(qm)
+
+#Runge-Kutta Step	main-loop
+def main():
+	for t in range(0, (t_end-t_start)/Step): 
+		t_now = t_start + t*Step
+			
+		for i in range(3,0,-1):
+			RK3_start = t_now
+
+			if i == 3:
+				n = 1, Step_acoustic = Step_RK3/3
+
+				U_tend = Adv("U")+Fcor("U")
+				V_tend = Adv("V")+Fcor("V")
+				W_tend = Adv("W")+Fcor("W")
+				Tp_tend = Adv("Tp")+Fcor("Tp")
+				gp_tend = Adv("gp")+Fcor("gp")
+				Mdry_tend = Adv("Mdry")+Fcor("Mdry")
+				
+			else:
+				n = ns/i, Step_acoustic = Step_RK3/ns
+
+			var_S = (
+					ModeS("U", U_tend),
+					ModeS("V", V_tend),
+					ModeS("W", W_tend),
+					ModeS("Mdry", Mdry_tend),
+					ModeS("Tp", Tp_tend),
+					ModeS("gp", gp_tend)
+					)
+
+			acoustic_time_integration(var_S, n, RK3_start, Step_acoustic)
+
+			Qm_tend = - mapFactorX*mapFactorY*(Spatial(timeAvg("U", acoustic_start, Step_acoustic*n)*Interp(qm, 2), 2) + Spatial(timeAvg("V", acoustic_start, Step_acoustic*n)*Interp(qm, 1), 1)) - mapFactorY*Spatial(timeAvg("O", acoustic_start, Step_acoustic*n)*Interp(qm, 0), 0)
+			Qm_advanced = data_collector.collect("Qm", RK3_start) + Step_RK3*Qm_tend
+
+			p = p_moist()
+			gp_perturb_from_refer_grad = -(Mdry_reference()*Ddry_perturb_from_refer()+Mdry*Ddry_reference())
+
+			Output("Qm", Qm_advanced, RK3_start + n*Step_acoustic)
+			Output("p", p, RK3_start + n*Step_acoustic)
+			Output("Ddry", Ddry, RK3_start + n*Step_acoustic)

@@ -18,7 +18,7 @@ class DataCollection:
 
 class AirDynamicData(DataCollection):
     def __init__(self, name):
-        data = Dataset("%s.nc"%name, "r")
+        data = Dataset("%s.nc"%name, "r", format="NETCDF4")
         super().__init__(data)
         self._time_map = self.prepare(data)
         
