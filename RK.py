@@ -44,20 +44,17 @@ epcilon = MW_wv/MW_dry
 
 data_collector = AirDynamicData("climate2014-01.nc")
 
-u = None, v = None, w = None,o = None,
-tp = None,  gp = None,
+u = None, v = None, w = None,o = None, tp = None,
+gp = None, p = None
 qv = None, qc = None, qr = None, qi = None,
 qm = None
-D = None
+D = None, Mdry = None, Ddry = Nne
 
 
 
-"Remember to revise U,V mapFactor in and Mdry during acoustic step"
-U = None
-V = None, W = None, O = None, Tp = None,
+#coupled
+U = None, V = None, W = None, O = None, Tp = None,
 Qv = None, Qc = None, Qr = None, Qi = None, Qm = None
-
-
 
 
 #reference state
@@ -114,16 +111,16 @@ def gp_reference_grad():
 	return grad
 
 def gp_reference():
-	gpr = Interp(gp_reference_grad(), 0)
+	gpr = Grad_Interp(gp_reference_grad(), 0)
 
 #perturbation state from reference
-def Mdry():
+def Md():
 	global p_sd
-	Md = p_sd - p_dry_surface()
-	return Md
+	dry_mass = p_sd - p_dry_surface()
+	return dry_mass
 
 def Mdry_perturb_from_refer():
-	Md_pfr = Mdry() - Mdry_reference()
+	Md_pfr = Md() - Mdry_reference()
 	return Md_pfr
 
 def p_perturb_from_refer_grad(): 
@@ -131,24 +128,24 @@ def p_perturb_from_refer_grad():
 	return grad
 
 def p_perturb_from_refer():
-	p_pfr = Interp(p_perturb_from_refer_grad(), 0)
+	p_pfr = Grad_Interp(p_perturb_from_refer_grad(), 0)
 	return p_pfr
 
-def Ddry():
+def Dd():
 	global Rd, Rv, p0, tp
-	Dd = Rd/p0*tp*(1+Rv/Rd*qv)*(p_perturb_from_refer() + p_reference()/p0)^(-cv()/cp())
-	return Dd
+	dry_density = Rd/p0*tp*(1+Rv/Rd*qv)*(p_perturb_from_refer() + p_reference()/p0)^(-cv()/cp())
+	return dry_density
 
 def Ddry_perturb_from_refer():
-	Dd_pfr = Ddry() - Ddry_reference()
+	Dd_pfr = Dd() - Ddry_reference()
 	return Dd_pfr
 
 def gp_perturb_from_refer_grad():
-	grad = -(Mdry()*Ddry_perturb_from_refer()+Mdry_perturb_from_refer()*Ddry_reference())
+	grad = -(Md()*Ddry_perturb_from_refer()+Mdry_perturb_from_refer()*Ddry_reference())
 	return grad
 
 def gp_perturb_from_refer ():
-	gp_pfr = Interp(gp_perturb_from_refer_grad(), 0)
+	gp_pfr = Grad_Interp(gp_perturb_from_refer_grad(), 0)
 	return gp_pfr 
 
 #diagnostic eq
@@ -177,23 +174,6 @@ def level_determine(var):
 	
 	return lvl
 
-def Interp(var, axis):#x is supposed to be a tuple
-	global wdK
-	if level_determine(var) == "mp":
-		wd_forward = np.concatenate((wd[axis], bc), axis)
-		wd_backward = np.concatenate((bc, wd[axis]), axis)
-		
-		var_forward = np.concatenate((var, bc), axis)
-		var_backward = np.concatenate((bc, var), axis)
-		
-		Var = 0.5*(wd_backward/(0.5*(wd_backward + wd_forward))*var_forward + wd_forward/(0.5*(wd_backward + wd_forward))*var_backward)
-	else:
-		var_forward = var.take(np.arange(1, var.shape[axis]), axis)
-		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
-		
-		Var = 0.5*(var_forward + var_backward)	
-	
-	return Var
 
 #import variable and turn it to coupled form
 def coupled(var):# a is any variable
@@ -235,7 +215,7 @@ def timeAvg(name, var_advanced, start, Step):
 
 
 def Spatial(var, axis):#axis option (x,y)
-	global wdX, wdY, BC
+	global wd, BC
 
 	if level_determine(var) == "mp":
 		var_forward = np.concatenate((var.take(np.arange(1, var.shape[axis]), axis), bc), axis)/2
@@ -247,22 +227,52 @@ def Spatial(var, axis):#axis option (x,y)
 	Var = (var_forward - var_backward)/wd[axis]
 
 	return Var
+
+def Interp(var, axis):#x is supposed to be a tuple
+	global wd
+	if level_determine(var) == "mp":
+		wd_forward = np.concatenate((wd[axis], bc), axis)
+		wd_backward = np.concatenate((bc, wd[axis]), axis)
+		
+		var_forward = np.concatenate((var, bc), axis)
+		var_backward = np.concatenate((bc, var), axis)
+		
+		Var = 0.5*(wd_backward/(0.5*(wd_backward + wd_forward))*var_forward + wd_forward/(0.5*(wd_backward + wd_forward))*var_backward)
+	else:
+		var_forward = var.take(np.arange(1, var.shape[axis]), axis)
+		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
+		
+		Var = 0.5*(var_forward + var_backward)	
 	
+	return Var
+
+def Grad_Interp(var)
+	global wd, BC
+	axis = 0
+	wd_forward = np.concatenate((wd[axis], bc), axis)
+	wd_backward = np.concatenate((bc, wd[axis]), axis)
+	wd = 0.5*(wd_backward + wd_forward)
+	Var = var*wd
+	for i in range(Var.shape[axis], -1, -1):
+		if i == 0 :
+			Var[i] = Var[i] + upper_bc
+		else:
+			Var[i] = Var[i] + Var[i+1]
+
+	if Var[0] != lower_bc:
+		Var[0] = lower_bc
+	
+	return Var
+
 def Vert_Integrat(var):
-	global wdK
+	global wd
 
 	product = 0
-
-	for i in range(0, len(var)):
+	axis  = 0
+	for i in range(0, var.shape[axis]):
 		product += var[i]
 	product = np.expand_dims(product, 0)
-
-	rearrange = np.array([])
-	for j in range(0, len(var)):
-		if j = 0:
-			rearrange = np.concatenate((product, product), 0)
-		else:
-			rearrange = np.concatenate((rearrange, product), 0)
+	
 	return product
 
 #tend Term
@@ -332,24 +342,33 @@ def Adv(var):
 #Time integration
 #O doesn't join time integration
 def ModeS(var, tend):
-	global mapFactorX, mapFactorY, U, V, O, gp, D
+	global mapFactorX, mapFactorY, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, p
+
+	p_refer = p_reference()
+	gp_refer = gp_reference()
+	Mdry_refer = Mdry_reference()
+	Ddry_refer = Ddry_reference()
+	p_pfr = p - p_refer
+	gp_pfr = gp - gp_refer
+	Mdry_pfr = Mdry - Mdry_refer
+	Ddry_pfr = Ddry - Ddry_refer
 
 	if var == "U":
-		S = -(Interp(Mdry,2)*Interp(D,2)*Spatial(p_perturb_from_refer,2)
-			-Interp(Mdry,2)*Interp(D_perturb_from_refer,2)*Spatial(p_reference(),2)) 
-			-Interp(D/Ddry, 2)
-			*(Interp(Mdry,2)*Spatial(Interp(gp_perturb_from_refer,0),2)
-				-Spatial(Interp(Interp(p_perturb_from_refer,0),2),0)*Spatial(Interp(gp,0),2)
-				+Interp(Mdry_perturb_from_refer,2)*Spatial(Interp(gp,0),2))
+		S = -(Interp(Mdry,2)*Interp(D,2)*Spatial(p_pfr,2)
+				-Interp(Mdry,2)*Interp(Ddry_pfr,2)*Spatial(p_refer,2)) 
+				-Interp(D/Ddry, 2)
+				*(Interp(Mdry,2)*Spatial(Interp(gp_pfr,0),2)
+					-Spatial(Interp(Interp(p_pfr,0),2),0)*Spatial(Interp(gp,0),2)
+					+Interp(Mdry_pfr,2)*Spatial(Interp(gp,0),2))
 			+ tend
 
 	elif var == "V":
-		S = -(Interp(Mdry,1)*Interp(D,1)*Spatial(p_perturb_from_refer,1)
-			-Interp(Mdry,1)*Interp(D_perturb_from_refer,1)*Spatial(p_referemce(),1)) 
-			-Interp(D/Ddry, 1)
-			*(Interp(Mdry,1)*Spatial(Interp(gp_perturb_from_refer,0),1)
-				-Spatial(Interp(Interp(p_perturb_from_refer,0),1),0)*Spatial(Interp(gp,0),1)
-				+Interp(Mdry_perturb_from_refer,1)*Spatial(Interp(gp,0),1)) 
+		S = -(Interp(Mdry,1)*Interp(D,1)*Spatial(p_pfr,1)
+				-Interp(Mdry,1)*Interp(Ddry_pfr,1)*Spatial(p_refer,1)) 
+				-Interp(D/Ddry, 1)
+				*(Interp(Mdry,1)*Spatial(Interp(gp_pfr,0),1)
+					-Spatial(Interp(Interp(p_pfr,0),1),0)*Spatial(Interp(gp,0),1)
+					+Interp(Mdry_pfr,1)*Spatial(Interp(gp,0),1)) 
 			+ tend
 
 	elif var == "Mdry":
@@ -359,7 +378,7 @@ def ModeS(var, tend):
 		S =  tend
 
 	elif var == "W":
-		S = g*(Interp(D/Ddry, 0)*(Spatial(p_perturb_from_refer,0)+M_referemce()*Interp(qr+qc+qv,0))-Mdry_perturb_from_refer)/mapFactorY 
+		S = g*(Interp(D/Ddry, 0)*(Spatial(p_pfr,0)+Mdry_refer*(qr+qc+qv))-Mdry_pfr)/mapFactorY 
 			+ tend
 
 	elif var == "gp":
@@ -368,69 +387,65 @@ def ModeS(var, tend):
 	
 	return S
 
-def ModeF(var, acoustic_start):
-	global mapFactorX, mapFactorY, U, V, O, gp, D
-
-	if var == "U":
-		F = Interp(M,2)*Interp(D,2)*Spatial(data_collector.collect(p_perturb, acoustic_start), 2)
-		  + (Interp(M,2)*Spatial(p_reference(),2)*Interp(data_collector.collect(D_perturb, acoustic_start),2))
-		  + Interp(D/Ddry, 2)*
-		  (
-		  	Interp(M,2)*Spatial(Interp(data_collector.collect(gp_perturb, acoustic_start), 0),2)
-		  	+ Spatial(Interp(gp, 0),2)*
-		  	(
-		  		Spatial(Interp(Interp(data_collector.collect(p_perturb, acoustic_start),0),2),0)
-		  		-Interp(data_collector.collect(M_perturb ,acoustic_start),2)
-		  		)
-
-		  	)
-
-	elif var == "V":
-		F = Interp(M,1)*Interp(D,1)*Spatial(data_collector.collect(p_perturb, acoustic_start),1)
-		  + (Interp(M,1)*Spatial(p_reference(),1)*Interp(data_collector.collect(D_perturb, acoustic_start),1))
-		  + Interp(D/Ddry, 1)*
-		  (
-		  	Interp(M,1)*Spatial(Interp(data_collector.collect(gp_perturb, acoustic_start), 0),1)
-		  	+Spatial(Interp(gp, 0),1)*
-		  	(
-		  		Spatial(Interp(Interp(data_collector.collect(p_perturb, acoustic_start),0),1),0)
-		  		-Interp(data_collector.collect(M_perturb,acoustic_start),1)
-		  		)
-		  	)
-
-	
 
 def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
-	global   U, V, W, Mdry, Tp, O, gp, p, D, Ddry, M
+	global mapFactorX, mapFactorY, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, p
 
 	U_S = var_S[0], V_S = var_S[1], W_S = var_S[2],
 	Mdry_S = var_S[3], Tp_S = var_S[4], gp_S = var_S[5]
 	
 	acoustic_start = RK3_start 
-	
+
+	p_refer = p_reference()
+	gp_refer = gp_reference()
+	Mdry_refer = Mdry_reference()
+	Ddry_refer = Ddry_reference()
+
+	p_pfr = p - p_refer
+	gp_pfr = gp - gp_refer
+	Mdry_pfr = Mdry - Mdry_refer
+	Ddry_pfr = Ddry - Ddry_refer
+
 	U_perturb = U - data_collector.collect("U", acoustic_start)
 	V_perturb = V - data_collector.collect("V", acoustic_start)
 	W_perturb = W - data_collector.collect("W", acoustic_start)
-	Mdry_perturb = Mdry - data_collector.collect("Mdry", acoustic_start)
+	O_perturb = O - data_collector.collect("O", acoustic_start)
+	Mdry_perturb = Mdry_pfr - data_collector.collect("Mdry_pfr", acoustic_start)
+	Ddry_perturb = Ddry_pfr - data_collector.collect("Ddry_pfr", acoustic_start)
 	Tp_perturb = Tp - data_collector.collect("Tp", acoustic_start)
-	gp_perturb = gp - data_collector.collect("gp", acoustic_start)
+	gp_perturb = gp_pfr - data_collector.collect("gp_pfr", acoustic_start)
+	p_perturb = cs_sqr()/Ddry*(Tp_perturb/Tp - Ddry_perturb/Ddry - Mdry_perturb/Mdry)
 
 	for j in range(0, n):
-		U_perturb = U_perturb + Step_acoustic*( U_S - ModeF("U",acoustic_start))
-		V_perturb = V_perturb + Step_acoustic*(V_S - ModeF("V",acoustic_start))
+
+		U_perturb = U_perturb + Step_acoustic*
+		( U_S - 
+			((mapFactorX/mapFactorY)*(D/Ddry)*(
+				Mdry*(Ddry*Spatial(data_collector.collect("p_perturb", acoustic_start),2)+Spatial(p_refer,2)*data_collector.collect("Ddry_perturb", acoustic_start)+Spatial(data_collector.collect("gp_perturb", acoustic_start),2))
+				+Spatial(gp, 2)*(Spatial(data_collector.collect("p_perturb", acoustic_start),0)-data_collector.collect("Mdry_perturb", acoustic_start)))
+			)
+		)
+		
+		V_perturb = V_perturb + Step_acoustic*
+		(V_S - 
+			((mapFactorY/mapFactorX)*(D/Ddry)*(
+				Mdry*(Ddry*Spatial(data_collector.collect("p_perturb", acoustic_start),1)+Spatial(p_refer,1)*data_collector.collect("Ddry_perturb", acoustic_start)+Spatial(data_collector.collect("gp_perturb", acoustic_start),1))
+				+Spatial(gp, 1)*(Spatial(data_collector.collect("p_perturb", acoustic_start),0)-data_collector.collect("Mdry_perturb", acoustic_start)))
+			)
+		)
 
 		Mdry_perturb_difference = mapFactorX*mapFactorY*Vert_Integrat(Spatial(U_perturb, 2) + Spatial(V_perturb, 1))
 		
 		Mdry_perturb = Mdry_perturb + Step_acoustic*Mdry_perturb_difference 		  
-		O_perturb = Vert_Integrat(Mdry_S - Mdry_perturb_difference - mapFactorX*mapFactorY*(Spatial(U_perturb, 2) + Spatial(V_perturb, 1)))/mapFactorY
+		O_perturb = Grad_Interp(Mdry_S - Mdry_perturb_difference - mapFactorX*mapFactorY*(Spatial(U_perturb, 2) + Spatial(V_perturb, 1)))/mapFactorY
 		Tp_perturb = Tp_perturb + Step_acoustic*(Tp_S - (mapFactorX*mapFactorY*(Spatial(U_perturb*tp,2)+Spatial(V_perturb*tp,1))+mapFactorY*Spatial(O_perturb*tp,0)))
 		 
 
-		W_perturb = W_perturb + Step_acoustic*(W_S  + g/mapFactorY*(D/Ddry)*()-timeAvg(Mdry_perturb))
-		gp_perturb = gp_perturb + Step_acoustic*(gp_S - ()/Mdry)
+		W_perturb = W_perturb + Step_acoustic*(W_S  + g/mapFactorY*(D/Ddry)*(Spatial(p_perturb ,0)-timeAvg("Mdry_perturb", Mdry_perturb, acoustic start, Step_acoustic)))
+		gp_perturb = gp_perturb + Step_acoustic*(gp_S - mapFactorY*( O_perturb * Spatial(gp, 0) - g*timeAvg("W_perturb", W_perturb, acoustic start, Step_acoustic))/Mdry)
 		 
 		#diagnostic equation
-		C = cs_sqr/Mdry_perturb/Ddry^2
+		C = cs_sqr()/Mdry_perturb/Ddry^2
 		Ddry_perturb = -(Spatial(gp_perturb ,0) + Ddry*Mdry_perturb)/Mdry
 		p_perturb = cs_sqr/Ddry*(Tp_perturb/Tp - Ddry_perturb/Ddry - Mdry_perturb/Mdry)
 
@@ -452,9 +467,19 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	Output("V", uncouple(V_perturb+V), acoustic_end)
 	Output("W", uncouple(W_perturb+W), acoustic_end)
 	Output("O", uncouple(O_perturb+O), acoustic_end)
-	Output("Mdry", Mdry_perturb+Mdry, acoustic_end)
 	Output("Tp", uncouple(Tp_perturb+Tp), acoustic_end)
-	Output("gp", gp_perturb+gp, acoustic_end)
+	Output("Mdry_pfr", Mdry_perturb+Mdry_pfr, acoustic_end)
+	Output("gp_pfr", gp_perturb+gp_pfr, acoustic_end)
+	Output("Mdry", Mdry_perturb+Mdry_pfr+Mdry_refer, acoustic_end)
+	Output("gp", gp_perturb+gp_pfr+gp_refer, acoustic_end)
+
+	U = U_perturb+U
+	V = V_perturb+V
+	W = W_perturb+W
+	O = O_perturb+O
+	Tp = Tp_perturb+Tp
+	Mdry = Mdry_perturb+Mdry_pfr+Mdry_refer
+	gp = gp_perturb+gp_pfr+gp_refer
 
 def prepare():
 	u = data_collector.collect("u", t_now)
@@ -468,7 +493,10 @@ def prepare():
 	qr = data_collector.collect("qr", t_now) 
 	qi = data_collector.collect("qi", t_now)
 	qm = qv+qc+qr+qi
-	D = Ddry()/(1+qm)
+	Ddry = Dd()
+	D = Ddry/(1+qm)
+	Mdry = Md()
+
 	U = coupled(u)
 	V = coupled(v)
 	W = coupled(w)
@@ -482,6 +510,8 @@ def prepare():
 
 #Runge-Kutta Step	main-loop
 def main():
+	global mapFactorX, mapFactorY, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, qm, p
+
 	for t in range(0, (t_end-t_start)/Step): 
 		t_now = t_start + t*Step
 			
@@ -512,12 +542,23 @@ def main():
 
 			acoustic_time_integration(var_S, n, RK3_start, Step_acoustic)
 
+			p_refer = p_reference()
+			gp_refer = gp_reference()
+			Mdry_refer = Mdry_reference()
+			Ddry_refer = Ddry_reference()
+
 			Qm_tend = - mapFactorX*mapFactorY*(Spatial(timeAvg("U", acoustic_start, Step_acoustic*n)*Interp(qm, 2), 2) + Spatial(timeAvg("V", acoustic_start, Step_acoustic*n)*Interp(qm, 1), 1)) - mapFactorY*Spatial(timeAvg("O", acoustic_start, Step_acoustic*n)*Interp(qm, 0), 0)
 			Qm_advanced = data_collector.collect("Qm", RK3_start) + Step_RK3*Qm_tend
 
-			p = p_moist()
-			gp_perturb_from_refer_grad = -(Mdry_reference()*Ddry_perturb_from_refer()+Mdry*Ddry_reference())
+			p_pfr = p_moist()
+			Ddry_pfr = (Spatial(data_collector.collect("gp", acoustic_end), 0) + Mdry*data_collector.collect("Mdry", acoustic_end))/-Mdry_refer
+			
 
 			Output("Qm", Qm_advanced, RK3_start + n*Step_acoustic)
-			Output("p", p, RK3_start + n*Step_acoustic)
-			Output("Ddry", Ddry, RK3_start + n*Step_acoustic)
+			Output("p_pfr", p_pfr, RK3_start + n*Step_acoustic)
+			Output("Ddry_pfr", Ddry_pfr, RK3_start + n*Step_acoustic)
+			Output("p", p_pfr + prefer, RK3_start + n*Step_acoustic)
+			Output("Ddry", Ddry_pfr + Ddry_refer, RK3_start + n*Step_acoustic)
+
+			p = p_refer + p_pfr
+			Ddry = Ddry_refer + Ddry_pfr
