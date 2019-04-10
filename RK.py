@@ -414,6 +414,7 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	Mdry_perturb = Mdry - data_collector.collect("Mdry", acoustic_start)
 	Tp_perturb = Tp - data_collector.collect("Tp", acoustic_start)
 	gp_perturb = gp - data_collector.collect("gp", acoustic_start)
+	p_perturb = p - data_collector.collect("p", acoustic_start)
 
 	for j in range(0, n):
 		U_perturb = U_perturb + Step_acoustic*( U_S - ModeF("U",acoustic_start))
