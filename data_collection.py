@@ -26,7 +26,7 @@ class AirDynamicData(DataCollection):
         return self._data[name][self._time_map[time]].filled()
 
     def collect(self, name, time):
-        return self.air_collect(name, time)
+        return self.air_collect(name, time),name
 
     def readFile(self, name):
         self._data = Dataset("%s.nc"%name, "r")
@@ -42,7 +42,5 @@ class AirDynamicData(DataCollection):
         time_map = {}
         for i in range(0, len(timezone)):
             time_map[timezone[i]] = i
-        return time_map
-
-    
+        return time_map    
    
