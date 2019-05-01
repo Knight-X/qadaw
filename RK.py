@@ -407,6 +407,7 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	Output("Ddry_perturb", Ddry_perturb, RK3_start )
 	Output("p_perturb", p_perturb, RK3_start)
 
+
 	for j in range(0, n):
 		acoustic_start = RK3_start + j*Step_acoustic
 
