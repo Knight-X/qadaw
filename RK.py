@@ -1,6 +1,7 @@
 import numpy as np
 from data_collection import AirDynamicData
 import datetime
+from data_rk import NormalData
 #Initialization
 data_collector 		= AirDynamicData("climate2014-01.nc")
 BC_collecctor 		=  AirDynamicData("wrfbdy_d01")
@@ -217,40 +218,7 @@ def timeAvg(name, var_advanced, start, Step):
 	return var_timeAvg
 
 
-def Spatial(var, axis):#axis option (x,y)
-	global wd, cplst
-	
 
-	if level_determine(var) == "mp":
-		var_forward  = np.concatenate((var.take(np.arange(1, var.shape[axis]), axis), bc_forward   ), axis)
-		var_backward = np.concatenate((bc_backward, var.take(np.arange(0, var.shape[axis]-1), axis)), axis)
-	else:
-		var_forward  = var.take(np.arange(1, var.shape[axis]  ), axis)
-		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
-
-	Var = (var_forward - var_backward)/wd[axis]/2
-
-	return Var
-
-def Interp(name, var, axis):#x is supposed to be a tuple
-	global wd, cplst
-
-
-	if level_determine(var) == "mp":
-		wd_forward  = wd[axis]
-		wd_backward = wd[axis]
-		
-		var_forward  = np.concatenate((var, bc_forward),  axis)
-		var_backward = np.concatenate((bc_backward, var), axis)
-		
-		Var = 0.5*(wd_backward/(0.5*(wd_backward + wd_forward))*var_forward + wd_forward/(0.5*(wd_backward + wd_forward))*var_backward)
-	else:
-		var_forward = var.take(np.arange(1, var.shape[axis]), axis)
-		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
-		
-		Var = 0.5*(var_forward + var_backward)	
-	
-	return Var
 
 def Grad_Interp(var, axis = 0)
 	global wd
@@ -326,17 +294,54 @@ def Fcor(var):#axis is supposed to be "U", "V" or "W"
 def Adv(var):
 	global mapFactorM, mapFactorM, U, V, O, gp, acoustic_start, Step_acoustic, ns
 	if var == "U":
-		tend = - mapFactorM*(Spatial(U*uncoupled(U), 2) + Spatial(V*uncoupled(U), 1)) - Spatial(O*uncoupled(U), 0)
+		U_spatial_2 = U.spatial(2)
+		U_spatial_1 = U.spatial(1)
+		U_spatial_0 = U.spatial(1)
+		V_Spatial = V.spatial(1)
+		O_Spatial = O.spatial(0)
+		tend = - mapFactorM*(U_spatial_2.getData() * uncoupled(U_spatial_2) + V_spatial.getData() *uncoupled(U_spatial_1)) - O_spatial.getData() *uncoupled(U_spatial_0)
 	elif var == "V":
-		tend = - mapFactorM*(Spatial(U*uncoupled(V), 2) + Spatial(V*uncoupled(V), 1)) - mapFactorM/mapFactorM*Spatial(O*uncoupled(V), 0)
+		V_spatial_2 = V.spatial(2)
+		V_spatial_1 = V.spatial(1)
+		V_spatial_0 = V.spatial(1)
+		U_spatial = U.spatial(2)
+		O_spatial = O.spatial(0)
+		tend = - mapFactorM*(U_spatial.getData() * uncoupled(V_spatial_2) + V_spatial_1.getData() *uncoupled(V_spatial_1)) - mapFactorX/mapFactorY* O_spatial.getData() * uncoupled(V_spatial_0)
 	elif var == "Mdry":
-		tend = - mapFactorM*mapFactorM*(Spatial(U, 2) + Spatial(V, 1)) - mapFactorM*Spatial(O, 0)
+		U_spatial_2 = U.spatial(2)
+		V_spatial_1 = V.spatial(1)
+		O_spatial = O.spatial(0)
+		tend = - mapFactorM*mapFactorM*(U_spatial_2.getData() + V_spatial_1.getData()) - mapFactorY* O_spatial.getData()
 	elif var == "Tp":
-		tend = - mapFactorM*mapFactorM*(Spatial(U*Interp(uncoupled(Tp)), 2) + Spatial(V*Interp(uncoupled(Tp)), 1)) - mapFactorM*Spatial(O*uncoupled(Tp), 0)
+		Tp_spatial_2 = Tp.spatial(2)
+		Tp_spatial_1 = Tp.spatial(1)
+		Tp_spatial_0 = Tp.spatial(1)
+		Tp_coupled_2 = uncopuled(Tp_spatial_2)
+		Tp_coupled_1 = uncopuled(Tp_spatial_1)
+		Tp_coupled_0 = uncopuled(Tp_spatial_0)
+		Tp_interp_2 = Tp_coupled_2.interp()
+		Tp_interp_1 = Tp_coupled_1.interp()
+		Tp_interp_0 = Tp_coupled_0.interp()
+		U_spatial = U.spatial(2)
+		V_spatial = V.spatial(1)
+		O_spatial = O.spatial(0)
+		tend = - mapFactorM*mapFactorM*(U_spatial.getData() *Tp_interp_2.getData() + V_spatial.getData()* Tp_interp_1.getData()) - mapFactorY*O_spatial.getData()*Tp_interp_0.getData()
 	elif var == "W":
-		tend = - mapFactorM*mapFactorM/mapFactorM*(Spatial(U*uncoupled(W), 2) + Spatial(V*uncoupled(W), 1)) - Spatial(O*uncoupled(W), 0)
+		U_spatial = U.spatial(2)
+		V_spatial = V.spatial(1)
+		O_spatial = O.spatial(0)
+		W_spatial_2 = W.spatial(2)
+		W_spatial_1 = W.spatial(1)
+		W_spatial_0 = W.spatial(0)
+		tend = - mapFactorM*mapFactorM/mapFactorM*(U_spatial.getData() * uncoupled(W_spatial_2 ) + V_spatial.getData()*uncoupled(W_spatial_1)) - Spatial(O_spatial.getData() *uncoupled(W_spatial_0)
 	elif var == "gp":
-		tend = - (mapFactorM*mapFactorM*(U*Spatial(gp, 2) + V*Spatial(gp, 1)) + mapFactorM*O*Spatial(gp, 0))/Mdry
+		Gp_spatial_2 = gp.spatial(2)
+		gp_spatial_1 = gp.spatial(1)
+		gp_spatial_0 = gp.spatial(0)
+		U_spatial = U.spatial(2)
+		V_spatial = V.spatial(1)
+		O_spatial = O.spatial(0)
+		tend = - (mapFactorM*mapFactorM*(U.getData()*gp_spatial_2.getData() + V.getData() * gp_spatial_1.getData() + mapFactorY*O_spatial.getData() * gp_spatial_0.getData()/Mdry
 	else:
 		tend = 0
 
