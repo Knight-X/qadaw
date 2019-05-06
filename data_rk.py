@@ -19,7 +19,8 @@ class NormalData(AbstractData):
 		self._boundary_data = boundary_data
 		self._level = level
 		self._wd = wd
-
+	def level(self):
+		return self._level 
 
 	def Spatial(self, axis):#axis option (x,y)
 

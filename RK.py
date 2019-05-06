@@ -182,29 +182,29 @@ def level_determine(var):
 def coupled(var):# a is any variable
 	global Mdry, mapFactorM, mapFactorU, mapFactorV
 
-	if level_determine(var) == "mp":
+	if var.level() == "mp":
 		M = Mdry, mF = 1
-	elif level_determine(var) == "u":
-		M = Interp(Mdry,2), mf = mapFactorU
-	elif level_determine(var) == "v":
-		M = Interp(Mdry,1), mf = mapFactorV
-	elif level_determine(var) == "w":
+	elif var.level() == "u":
+		M = Mdry.Inter(2), mf = mapFactorU
+	elif var.level() == "v":
+		M = Mdry.Inter(1), mf = mapFactorV
+	elif var.level() == "w":
 		M = Mdry, mf = mapFactorM
-	Var = M*var/mF
+	Var = M.getData()*var.getData()/mF
 
 	return Var
 
 def uncoupled(Var):
 	global Mdry
-	if level_determine(var) == "mp":
+	if var.level() == "mp":
 		M = Mdry, mF = 1
-	elif level_determine(var) == "u":
-		M = Interp(Mdry,2), mf = mapFactorU
-	elif level_determine(var) == "v":
-		M = Interp(Mdry,1), mf = mapFactorV
-	elif level_determine(var) == "w":
+	elif var.level() == "u":
+		M = Mdry.Inter(2), mf = mapFactorU
+	elif var.level() == "v":
+		M = Mdry.Inter(1), mf = mapFactorV
+	elif var.level() == "w":
 		M = Mdry, mf = mapFactorM
-	var = *mf*Var/M
+	var = *mf*Var.getData()/M.getData()
 
 	return var
 
@@ -257,33 +257,46 @@ def Fcor(var):#axis is supposed to be "U", "V" or "W"
 	global t_now, rEarth, e, f, sinalpha, cosalpha, mapFactorM, rotationAngle, U, V, W
 
 	if var == "U":
-		Vxy = Interp(Interp(V,1),2)
-		Wxk = Interp(Interp(W,0),2)
-		tend = Vxy*(
-			Interp(f,2)+Interp((Interp(uncouple(U),2)*Spatial(mapFactorM,1)-Interp(uncouple(V),1)*Spatial(mapFactorM,2)),2)
+		Vxy = V.interp(1).interp(2)
+		Wxk = W.interp(0).interp(2)
+		uncopuled_u = uncopule(U)
+		uncopuled_v = uncopule(V)
+		internal_data = uncopuled_u.interp(2).getData() * mapFactorM.spatial(1).getData() -
+			uncopuled_v.interp(1).getData() * mapFactorM.spatial(2)
+		internal = NormalData(internal_data)
+		tend1 = Vxy*(
+			f.interp(2).getData() + internal.interp(2).getData()
 			)
-			- Interp(e,2)*Wxk*Interp(cosplpha, 2)
-			- uncouple(U)*Wxk/rEarth
-
+		tend2 = Interp(e,2)*Wxk*Interp(cosplpha, 2)
+		tend3 = uncouple(U)*Wxk/rEarth
+        tend = tend1 - tend2 - tend3
 	elif var == "V":
 		Uxy = Interp(Interp(U,2),1)
-		Wyk = Interp(Interp(W,0),1)
-		tend = - Uxy*(
-			Interp(f,1)+Interp((Interp(uncople(U),2)*Spatial(mapFactorM,1)-Interp(uncouple(V),1)*Spatial(mapFactorM,2)),1)
+		Uxy = U.interp(2).interp(1)
+		Wyk = W.interp(0).interp(1)
+		uncopuled_u = uncopule(U)
+		uncopuled_v = uncopule(V)
+		internal_data = uncopuled_u.interp(2).getData() * mapFactor.spatail(1).getData()
+			- uncoupled_v.interp(1).getData() * mapFactorM.spatial(2).getData()
+		internal = NormalData(internal_data)
+		tend = - Uxy.getData() *(
+			f.interp(1).getData() + internal.interp(1).getData()
 			)
-			+ Interp(e,1)*Wyk*Interp(sinalpha, 1)
-			- uncouple(V)*Wyk/rEarth
-
+			+ e.interp(1).getData() *Wyk.getData() * sinalpha.interp(1).getData()
+			- uncopuled_v.getData() *Wyk.getData() /rEarth
+		internal = 
 	elif var == "W":
-		Uxk = Interp(Interp(U,2),0)
-		Vyk = Interp(Interp(V,1),0)
-		tend = e*(
-			Uxk*cosplpha
-			- Vyk*sinalpha
+		Uxk = U.interp(2).interp(0)
+		Vyk = V.interp(1).interp(0)
+		uncopuled_v = uncopule(V)
+		uncopuled_u = uncopule(U)
+		tend = e.getData() *(
+			Uxk.getData() *cosplpha.getData()
+			- Vyk.getData() *sinalpha.getData()
 			)
 			+ (
-				Interp(Interp(uncouple(U),2),0)*Uxk
-				+ Interp(Interp(uncouple(V),1),0)*Vyk
+				uncouple_u.interp(2).interp(0).getData() * Uxk.getData()
+				+ uncouple_v.interp(1).interp(0).getData() * Vyk.getData()
 				)/rEarth
 
 	else:
@@ -352,21 +365,28 @@ def ModeS(var, tend):
 	global mapFactorM, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, p, p_refer, gp_refer, Mdry_refer, Ddry_refer, p_pfr, gp_pfr, Mdry_pfr, Ddry_pfr 
 
 	if var == "U":
-		S = -(Interp(Mdry,2)*Interp(D,2)*Spatial(p_pfr,2)
-				-Interp(Mdry,2)*Interp(Ddry_pfr,2)*Spatial(p_refer,2)) 
-				-Interp(D/Ddry, 2)
-				*(Interp(Mdry,2)*Spatial(Interp(gp_pfr,0),2)
-					-Spatial(Interp(Interp(p_pfr,0),2),0)*Spatial(Interp(gp,0),2)
-					+Interp(Mdry_pfr,2)*Spatial(Interp(gp,0),2))
+		ratio = D.getData() / Ddry.getData()
+		interal = NormalData(ratio)
+		first_part = Mdry.interp(2).getData() * D.interp(2).getData() * p_pfr.interp(2).getData()
+			- Mdry.interp(2).getData() * Ddry_pfr.interp(2).getData() * p_refer.interp(2).getData()
+		
+		S = -(first_part) 
+				- interal.interp(2).getData()
+				*(Mdry.interp(2).getData() * gp_pfr.interp(0).spatial(2).getData()
+					-p_pfr.interp(0).interp(2).spatail(0).getData() * gp.interp(0).spatial(2).getData() 
+					+Mdry_pfr.interp(2).getData() * gp.interp(0).spatial(2).getData()
 			+ tend
 
 	elif var == "V":
-		S = -(Interp(Mdry,1)*Interp(D,1)*Spatial(p_pfr,1)
-				-Interp(Mdry,1)*Interp(Ddry_pfr,1)*Spatial(p_refer,1)) 
-				-Interp(D/Ddry, 1)
-				*(Interp(Mdry,1)*Spatial(Interp(gp_pfr,0),1)
-					-Spatial(Interp(Interp(p_pfr,0),1),0)*Spatial(Interp(gp,0),1)
-					+Interp(Mdry_pfr,1)*Spatial(Interp(gp,0),1)) 
+		ratio = D.getData() / Ddry.getData()
+		interal = NormalData(ratio)
+		first_part = Mdry.interp(1).getData() * D.interp(1).getData() * p_pfr.spatial(1).getData()
+			- Mdry.interp(1).getData() * Ddry_pfr.interp(1).getData() * p_refer.spatial(1).getData()
+		S = -(first_part) 
+				-internal.interp(1).getData()
+				*(Mdry.interp(1).getData() * gp_pfr.interp(0).spatial(1).getData()
+					-p_pfr.interp(0).interp(1).spatial(0).getData() * gp.interp(0).spatial(1).getData()
+					+Mdry_pfr.interp(1).getData() * gp.interp(0).spatial(1).getData()
 			+ tend
 
 	elif var == "Mdry":
@@ -376,11 +396,14 @@ def ModeS(var, tend):
 		S =  tend
 
 	elif var == "W":
-		S = g*(Interp(D/Ddry, 0)*(Spatial(p_pfr,0)+Mdry_refer*(qr+qc+qv))-Mdry_pfr)/mapFactorM 
+		ratio = D.getData() / Ddry.getData()
+		interal = NormalData(ratio)
+		S = g*(internal.interp(0).getData() *( p_pfr.spatial(0).getData() + 
+		Mdry_refer.getData() * (qr.getData() +qc.getData() +qv.getData()))-Mdry_pfr.getData() )/mapFactorM.getData()
 			+ tend
 
 	elif var == "gp":
-		S = mapFactorM*g*W/Mdry
+		S = mapFactorM.getData() *g* W.getData() /Mdry.getData()
 			+ tend
 	
 	return S
