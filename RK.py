@@ -346,7 +346,7 @@ def Adv(var):
 		W_spatial_2 = W.spatial(2)
 		W_spatial_1 = W.spatial(1)
 		W_spatial_0 = W.spatial(0)
-		tend = - mapFactorM*mapFactorM/mapFactorM*(U_spatial.getData() * uncoupled(W_spatial_2 ) + V_spatial.getData()*uncoupled(W_spatial_1)) - Spatial(O_spatial.getData() *uncoupled(W_spatial_0)
+		tend = - mapFactorM*mapFactorM/mapFactorM*(U_spatial.getData() * uncoupled(W_spatial_2) + V_spatial.getData()*uncoupled(W_spatial_1)) - O_spatial.getData() *uncoupled(W_spatial_0)
 	elif var == "gp":
 		Gp_spatial_2 = gp.spatial(2)
 		gp_spatial_1 = gp.spatial(1)
@@ -423,7 +423,7 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	gp_perturb 	 = data_collector.collect("PH", RK3_start ) 		- gp_pfr
 	Mdry_perturb = data_collector.collect("MU", RK3_start ) 		- Mdry_pfr
 	Ddry_perturb = -(Spatial(gp_perturb, 0) + Ddry*Mdry_perturb)/Mdry 
-	p_perturb 	 = cs_sqr()/Ddry*(Tp_perturb/Tp - Ddry_perturb/Ddry - Mdry_perturb/Mdry)
+	p_perturb_data 	 = cs_sqr()/Ddry*(Tp_perturb/Tp - Ddry_perturb/Ddry - Mdry_perturb/Mdry)
 
 	Output("U_perturb", U_perturb, RK3_start )
 	Output("V_perturb", V_perturb, RK3_start )
@@ -433,42 +433,49 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	Output("Tp_perturb", Tp_perturb, RK3_start )
 	Output("gp_perturb", gp_perturb, RK3_start )
 	Output("Ddry_perturb", Ddry_perturb, RK3_start )
-	Output("p_perturb", p_perturb, RK3_start)
+	Output("p_perturb", p_perturb_data, RK3_start)
 
 
 	for j in range(0, n):
 		acoustic_start = RK3_start + j*Step_acoustic
-
-		U_perturb = U_perturb + Step_acoustic*
+		p_perturb = NormalData(data_collector.collect("p_perturb", acoustic_start))
+		ddry_perturb = NormalData(data_collector.collect("Ddry_perturb", acoustic_start))
+		gp_perturb = NormalData(data_collector.collect("gp_perturb", acoustic_start))
+		p_perturb = NormalData(data_collector.collect("p_perturb", acoustic_start))
+		mdry_perturb = NormalData(data_collector.collect("Mdry_perturb", acoustic_start))
+		U_perturb_data = U_perturb + Step_acoustic*
 		( U_S - 
 			((mapFactorM/mapFactorM)*(D/Ddry)*(
-				Mdry*(Ddry*Spatial(data_collector.collect("p_perturb", acoustic_start),2)+Spatial(p_refer,2)*data_collector.collect("Ddry_perturb", acoustic_start)+Spatial(data_collector.collect("gp_perturb", acoustic_start),2))
-				+Spatial(gp, 2)*(Spatial(data_collector.collect("p_perturb", acoustic_start),0)-data_collector.collect("Mdry_perturb", acoustic_start)))
+				Mdry*(Ddry*p_perturb.spatial(2).getData()+Spatial(p_refer,2)*ddry_perturb.getData()+gp_perturb.spatial(2).getData())
+				+Spatial(gp, 2)*(p_perturb.spatial(0).getData()-mdry_perturb.getData()))
 			)
 		)
-
-		V_perturb = V_perturb + Step_acoustic*
+		U_perturb = NormalData(U_perturb_data)
+		V_perturb_data = V_perturb + Step_acoustic*
 		(V_S - 
 			((mapFactorM/mapFactorM)*(D/Ddry)*(
-				Mdry*(Ddry*Spatial(data_collector.collect("p_perturb", acoustic_start),1)+Spatial(p_refer,1)*data_collector.collect("Ddry_perturb", acoustic_start)+Spatial(data_collector.collect("gp_perturb", acoustic_start),1))
-				+Spatial(gp, 1)*(Spatial(data_collector.collect("p_perturb", acoustic_start),0)-data_collector.collect("Mdry_perturb", acoustic_start)))
+				Mdry.getData() *(Ddry.getData() *p_perturb.spatial(1).getData() + p_refer.spatial(1).getData() * ddry_perturb.getData() + gp_perturb.spatial(1).getData())
+				+gp.spatial(1).getData() * (p_perturb.spatial(0).getData() - mdry_perturb.getData()))
 			)
 		)
-
+		V_perturb = NormalData(V_perturb_data)
 		Mdry_perturb_difference = mapFactorM*mapFactorM*Vert_Integrat(Spatial(U_perturb, 2) + Spatial(V_perturb, 1))
 		
-		Mdry_perturb = Mdry_perturb + Step_acoustic*Mdry_perturb_difference 		  
-		O_perturb = Grad_Interp(Mdry_S - Mdry_perturb_difference - mapFactorM*mapFactorM*(Spatial(U_perturb, 2) + Spatial(V_perturb, 1)))/mapFactorM
-		Tp_perturb = Tp_perturb + Step_acoustic*(Tp_S - (mapFactorM*mapFactorM*(Spatial(U_perturb*tp,2)+Spatial(V_perturb*tp,1))+mapFactorM*Spatial(O_perturb*tp,0)))
+		Mdry_perturb_data = Mdry_perturb.getData() + Step_acoustic*Mdry_perturb_difference 		  
+		O_perturb_data = Grad_Interp(Mdry_S - Mdry_perturb_difference - mapFactorM*mapFactorM*(U_perturb.spatial(2).getData()  + V_perturb.spatial(1).getData()))/mapFactorM
+		U_perturb_tp = NormalData(U_perturb.getData() * tp.getData())
+		V_perturb_tp = NormalData(V_perturb.getData() * tp.getData())
+		O_perturb_tp = NormalData(O_perturb_data * tp.getData())
+		Tp_perturb = Tp_perturb + Step_acoustic*(Tp_S - (mapFactorM*mapFactorM*(U_perturb_tp.spatial(2).getData() + V_perturb_tp.spatial(1).getData())+mapFactorM* O_perturb_tp.spatial(0).getData()))
 		 
 
-		W_perturb = W_perturb + Step_acoustic*(W_S  + g/mapFactorM*(D/Ddry)*(Spatial(p_perturb ,0)-timeAvg("Mdry_perturb", Mdry_perturb, acoustic start, Step_acoustic)))
-		gp_perturb = gp_perturb + Step_acoustic*(gp_S - mapFactorM*( O_perturb * Spatial(gp, 0) - g*timeAvg("W_perturb", W_perturb, acoustic start, Step_acoustic))/Mdry)
+		W_perturb = W_perturb + Step_acoustic*(W_S  + g/mapFactorM*(D/Ddry)*(p_perturb.spatial(0).getData() - timeAvg("Mdry_perturb", Mdry_perturb_data, acoustic start, Step_acoustic)))
+		gp_perturb = gp_perturb + Step_acoustic*(gp_S - mapFactorM*( O_perturb_data * gp.spatial(0).getData() - g*timeAvg("W_perturb", W_perturb.getData(), acoustic start, Step_acoustic))/Mdry)
 		 
 		#diagnostic equation
 		C = cs_sqr()/Mdry_perturb/Ddry^2
-		Ddry_perturb = -(Spatial(gp_perturb ,0) + Ddry*Mdry_perturb)/Mdry
-		p_perturb = cs_sqr/Ddry*(Tp_perturb/Tp - Ddry_perturb/Ddry - Mdry_perturb/Mdry)
+		Ddry_perturb_data = -(gp_perturb.spatial(0).getData() + Ddry.getData() * Mdry_perturb_data)/Mdry.getData()
+		p_perturb = cs_sqr()/Ddry.getData() *(Tp_perturb/Tp - Ddry_perturb_data/Ddry.getData() - Mdry_perturb_data/Mdry.getData())
 
 		acoustic_end = RK3_start + (j+1)*Step_acoustic
 
