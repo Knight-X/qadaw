@@ -8,21 +8,19 @@ class AbstractData:
 	def getData(self):
 		return self._data
 	
-	def setData(self, data):
-		self._data = data
-
 
 class NormalData(AbstractData):
 
 	def __init__(self, data, boundary_data,
 	level, wd):
+		super().__init__(data)
 		self._boundary_data = boundary_data
 		self._level = level
 		self._wd = wd
 	def level(self):
 		return self._level 
 
-	def Spatial(self, axis):#axis option (x,y)
+	def spatial(self, axis):#axis option (x,y)
 
 		var_forward = np.concatenate((self._data.take(np.arange(1, self._data.shape[axis]), axis), self._boundary_data), axis)
 		var_backward = np.concatenate((self._boundary_data, self._data.take(np.arange(0, self._data.shape[axis]-1), axis)), axis)
@@ -31,7 +29,7 @@ class NormalData(AbstractData):
 
 		return NormalData(Var, self._boundary_data, self._level, self._wd)
 
-	def Interp(self, axis):#x is supposed to be a tuple
+	def interp(self, axis):#x is supposed to be a tuple
 
 
 		wd_forward = self._wd[axis]
@@ -45,39 +43,20 @@ class NormalData(AbstractData):
 		return NormalData(Var, self._boundary_data, self._level, self._wd)
 
 class ConstData(AbstractData):
-	def __init__(self, data, level):
-		self._data = data
+	def __init__(self, data, level, wd):
+		super().__init__(data)
 		self._level = level
+		self._wd = wd
 	
-	def spatial(self):
+	def spatial(self, axis):
 		var_forward = self._data.take(np.arange(1, self._data.shape[axis]), axis)
 		var_backward = self._data.take(np.arange(0, self._data.shape[axis]-1), axis)
-		Var = (var_forward - var_backward)/wd[axis]
-		return Var
+		Var = (var_forward - var_backward)/self._wd[axis]
+		return ConstData(Var, self._level, self._wd)
 
-	def interp(self):
+	def interp(self, axis):
 		var_forward = self._data.take(np.arange(1, self._data.shape[axis]), axis)
 		var_backward = self._data.take(np.arange(0, self._data.shape[axis]-1), axis)
 		Var = 0.5*(var_forward + var_backward)	
-		return Var
+		return ConstData(Var, self._level, self._wd)
 
-
-def Interp(name, var, axis):#x is supposed to be a tuple
-	global wd, cplst
-
-
-	if level_determine(var) == "mp":
-		wd_forward  = wd[axis]
-		wd_backward = wd[axis]
-		
-		var_forward  = np.concatenate((var, bc_forward),  axis)
-		var_backward = np.concatenate((bc_backward, var), axis)
-		
-		Var = 0.5*(wd_backward/(0.5*(wd_backward + wd_forward))*var_forward + wd_forward/(0.5*(wd_backward + wd_forward))*var_backward)
-	else:
-		var_forward = var.take(np.arange(1, var.shape[axis]), axis)
-		var_backward = var.take(np.arange(0, var.shape[axis]-1), axis)
-		
-		Var = 0.5*(var_forward + var_backward)	
-	
-	return Var
