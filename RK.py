@@ -165,14 +165,14 @@ def p_moist():
 #level identification
 def level_determine(var):
 	global nX, nY, nK
-
-	if len(var) == nK and len(var[0]) == nY and len(var[0][0]) == nX:
+	data = var.getData()
+	if len(data) == nK and len(data[0]) == nY and len(data[0][0]) == nX:
 			lvl = "mp"
-	elif len(var) == nK and len(var[0]) == nY and len(var[0][0]) == nX+1:
+	elif data(var) == nK and len(data[0]) == nY and len(data[0][0]) == nX+1:
 			lvl = "u"
-	elif len(var) == nK and len(var[0]) == nY+1 and len(var[0][0]) == nX:
+	elif data(var) == nK and len(data[0]) == nY+1 and len(data[0][0]) == nX:
 			lvl = "v"
-	elif len(var) == nK+1 and len(var[0]) == nY and len(var[0][0]) == nX:
+	elif data(var) == nK+1 and len(data[0]) == nY and len(data[0][0]) == nX:
 			lvl = "w"
 	
 	return lvl
@@ -190,11 +190,15 @@ def coupled(var):# a is any variable
 		M = Mdry.Inter(1), mf = mapFactorV
 	elif var.level() == "w":
 		M = Mdry, mf = mapFactorM
-	Var = M.getData()*var.getData()/mF
-
+	Var_data = M.getData()*var.getData()/mF
+	Var = None
+	if type == NormalData:
+		Var = NormalData(Var_data, var.boundary_data, var.level, var.wd)
+	elif type == CosntData:
+		Var = ConstData(Var_data, var.level, var.wd)
 	return Var
 
-def uncoupled(Var):
+def uncoupled(var):
 	global Mdry
 	if var.level() == "mp":
 		M = Mdry, mF = 1
@@ -204,9 +208,14 @@ def uncoupled(Var):
 		M = Mdry.Inter(1), mf = mapFactorV
 	elif var.level() == "w":
 		M = Mdry, mf = mapFactorM
-	var = *mf*Var.getData()/M.getData()
+	Var_data = *mf*var.getData()/M.getData()
+	Var = None
+	if type == NormalData:
+		Var = NormalData(Var_data, var.boundary_data, var.level, var.wd)
+	elif type == CosntData:
+		Var = ConstData(Var_data, var.level, var.wd)
 
-	return var
+	return Var
 
 #Operator
 def timeAvg(name, var_advanced, start, Step):
@@ -216,9 +225,6 @@ def timeAvg(name, var_advanced, start, Step):
 	var_timeAvg = (1+Beta)/2*var_advanced+(1-Beta)/2*var_prev
 
 	return var_timeAvg
-
-
-
 
 def Grad_Interp(var, axis = 0)
 	global wd
