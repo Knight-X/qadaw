@@ -163,9 +163,9 @@ def p_moist():
 	return pressure 
 
 #level identification
-def level_determine(var):
+def level_determine(data):
 	global nX, nY, nK
-	data = var.getData()
+	
 	if len(data) == nK and len(data[0]) == nY and len(data[0][0]) == nX:
 			lvl = "mp"
 	elif data(var) == nK and len(data[0]) == nY and len(data[0][0]) == nX+1:
@@ -192,9 +192,9 @@ def coupled(var):# a is any variable
 		M = Mdry, mf = mapFactorM
 	Var_data = M.getData()*var.getData()/mF
 	Var = None
-	if type == NormalData:
+	if isinstance(var, NormalData):
 		Var = NormalData(Var_data, var.boundary_data, var.level, var.wd)
-	elif type == CosntData:
+	elif isinstance(var, CosntData):
 		Var = ConstData(Var_data, var.level, var.wd)
 	return Var
 
@@ -210,9 +210,9 @@ def uncoupled(var):
 		M = Mdry, mf = mapFactorM
 	Var_data = *mf*var.getData()/M.getData()
 	Var = None
-	if type == NormalData:
+	if isinstance(var, NormalData):
 		Var = NormalData(Var_data, var.boundary_data, var.level, var.wd)
-	elif type == CosntData:
+	elif isinstance(var, CosntData):
 		Var = ConstData(Var_data, var.level, var.wd)
 
 	return Var
@@ -318,19 +318,19 @@ def Adv(var):
 		U_spatial_0 = U.spatial(1)
 		V_Spatial = V.spatial(1)
 		O_Spatial = O.spatial(0)
-		tend = - mapFactorM*(U_spatial_2.getData() * uncoupled(U_spatial_2) + V_spatial.getData() *uncoupled(U_spatial_1)) - O_spatial.getData() *uncoupled(U_spatial_0)
+		tend = - mapFactorM.getData() *(U_spatial_2.getData() * uncoupled(U_spatial_2) + V_spatial.getData() *uncoupled(U_spatial_1)) - O_spatial.getData() *uncoupled(U_spatial_0)
 	elif var == "V":
 		V_spatial_2 = V.spatial(2)
 		V_spatial_1 = V.spatial(1)
 		V_spatial_0 = V.spatial(1)
 		U_spatial = U.spatial(2)
 		O_spatial = O.spatial(0)
-		tend = - mapFactorM*(U_spatial.getData() * uncoupled(V_spatial_2) + V_spatial_1.getData() *uncoupled(V_spatial_1)) - mapFactorX/mapFactorY* O_spatial.getData() * uncoupled(V_spatial_0)
+		tend = - mapFactorM.getData() *(U_spatial.getData() * uncoupled(V_spatial_2) + V_spatial_1.getData() *uncoupled(V_spatial_1)) - mapFactorX.getData() /mapFactorY.getData() * O_spatial.getData() * uncoupled(V_spatial_0)
 	elif var == "Mdry":
 		U_spatial_2 = U.spatial(2)
 		V_spatial_1 = V.spatial(1)
 		O_spatial = O.spatial(0)
-		tend = - mapFactorM*mapFactorM*(U_spatial_2.getData() + V_spatial_1.getData()) - mapFactorY* O_spatial.getData()
+		tend = - mapFactorM.getData() * mapFactorM.getData() *(U_spatial_2.getData() + V_spatial_1.getData()) - mapFactorY.getData() * O_spatial.getData()
 	elif var == "Tp":
 		Tp_spatial_2 = Tp.spatial(2)
 		Tp_spatial_1 = Tp.spatial(1)
@@ -344,7 +344,7 @@ def Adv(var):
 		U_spatial = U.spatial(2)
 		V_spatial = V.spatial(1)
 		O_spatial = O.spatial(0)
-		tend = - mapFactorM*mapFactorM*(U_spatial.getData() *Tp_interp_2.getData() + V_spatial.getData()* Tp_interp_1.getData()) - mapFactorY*O_spatial.getData()*Tp_interp_0.getData()
+		tend = - mapFactorM.getData() * mapFactorM.getData() *(U_spatial.getData() *Tp_interp_2.getData() + V_spatial.getData()* Tp_interp_1.getData()) - mapFactorY*O_spatial.getData()*Tp_interp_0.getData()
 	elif var == "W":
 		U_spatial = U.spatial(2)
 		V_spatial = V.spatial(1)
@@ -352,7 +352,7 @@ def Adv(var):
 		W_spatial_2 = W.spatial(2)
 		W_spatial_1 = W.spatial(1)
 		W_spatial_0 = W.spatial(0)
-		tend = - mapFactorM*mapFactorM/mapFactorM*(U_spatial.getData() * uncoupled(W_spatial_2) + V_spatial.getData()*uncoupled(W_spatial_1)) - O_spatial.getData() *uncoupled(W_spatial_0)
+		tend = - mapFactorM.getData() * mapFactorM.getData() /mapFactorM.getData() *(U_spatial.getData() * uncoupled(W_spatial_2) + V_spatial.getData()*uncoupled(W_spatial_1)) - O_spatial.getData() *uncoupled(W_spatial_0)
 	elif var == "gp":
 		Gp_spatial_2 = gp.spatial(2)
 		gp_spatial_1 = gp.spatial(1)
@@ -360,7 +360,7 @@ def Adv(var):
 		U_spatial = U.spatial(2)
 		V_spatial = V.spatial(1)
 		O_spatial = O.spatial(0)
-		tend = - (mapFactorM*mapFactorM*(U.getData()*gp_spatial_2.getData() + V.getData() * gp_spatial_1.getData() + mapFactorY*O_spatial.getData() * gp_spatial_0.getData()/Mdry
+		tend = - (mapFactorM.getData() * mapFactorM.getData() *(U.getData()*gp_spatial_2.getData() + V.getData() * gp_spatial_1.getData() + mapFactorY*O_spatial.getData() * gp_spatial_0.getData()/Mdry.getData() 
 	else:
 		tend = 0
 
@@ -381,7 +381,7 @@ def ModeS(var, tend):
 				*(Mdry.interp(2).getData() * gp_pfr.interp(0).spatial(2).getData()
 					-p_pfr.interp(0).interp(2).spatail(0).getData() * gp.interp(0).spatial(2).getData() 
 					+Mdry_pfr.interp(2).getData() * gp.interp(0).spatial(2).getData()
-			+ tend
+			+ tend.getData()
 
 	elif var == "V":
 		ratio = D.getData() / Ddry.getData()
@@ -393,7 +393,7 @@ def ModeS(var, tend):
 				*(Mdry.interp(1).getData() * gp_pfr.interp(0).spatial(1).getData()
 					-p_pfr.interp(0).interp(1).spatial(0).getData() * gp.interp(0).spatial(1).getData()
 					+Mdry_pfr.interp(1).getData() * gp.interp(0).spatial(1).getData()
-			+ tend
+			+ tend.getData()
 
 	elif var == "Mdry":
 		S =  tend
@@ -406,11 +406,11 @@ def ModeS(var, tend):
 		interal = NormalData(ratio)
 		S = g*(internal.interp(0).getData() *( p_pfr.spatial(0).getData() + 
 		Mdry_refer.getData() * (qr.getData() +qc.getData() +qv.getData()))-Mdry_pfr.getData() )/mapFactorM.getData()
-			+ tend
+			+ tend.getData()
 
 	elif var == "gp":
 		S = mapFactorM.getData() *g* W.getData() /Mdry.getData()
-			+ tend
+			+ tend.getData()
 	
 	return S
 
@@ -421,24 +421,40 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 	U_S = var_S[0], V_S = var_S[1], W_S = var_S[2],
 	Mdry_S = var_S[3], Tp_S = var_S[4], gp_S = var_S[5]
 
-	U_perturb 	 = coupled(data_collector.collect("U", RK3_start )) - U
-	V_perturb 	 = coupled(data_collector.collect("V", RK3_start )) - V
-	W_perturb 	 = coupled(data_collector.collect("W", RK3_start )) - W
-	O_perturb 	 = coupled(data_collector.collect("O", RK3_start )) - O
-	Tp_perturb 	 = coupled(data_collector.collect("T", RK3_start )) - Tp
-	gp_perturb 	 = data_collector.collect("PH", RK3_start ) 		- gp_pfr
-	Mdry_perturb = data_collector.collect("MU", RK3_start ) 		- Mdry_pfr
-	Ddry_perturb = -(Spatial(gp_perturb, 0) + Ddry*Mdry_perturb)/Mdry 
-	p_perturb_data 	 = cs_sqr()/Ddry*(Tp_perturb/Tp - Ddry_perturb/Ddry - Mdry_perturb/Mdry)
+	u_initial_data = data_collector.collect("U", RK3_start )
+	U_initial = coupled(NormalData(U_initial_data, BC_collecctor.collect("U", RK3_start), level_determine(u_initial_data), wd))
+	U_perturb_data 	 = U_initial.getData() - U.getData()
+	v_initial_data = data_collector.collect("V", RK3_start )
+	V_initial = coupled(NormalData(V_initial_data, BC_collecctor.collect("V", RK3_start), level_determine(v_initial_data), wd))
+	V_perturb_data 	 = V_initial.getData() - V.getData()
+	w_initial_data = data_collector.collect("W", RK3_start )
+	W_initial 	 = coupled(NormalData(W_initial_data, BC_collecctor.collect("W", RK3_start), level_determine(w_initial_data), wd))
+	W_perturb_data = W_initial.getData() - W.getData()
+	o_initial_data = data_collector.collect("O", RK3_start)
+	O_initial 	 = coupled(NormalData(O_initial_data, BC_collecctor.collect("O", RK3_start), level_determine(o_initial_data), wd))
+	O_perturb_data = O_initial.getData() - O.getData()
+	tp_initial_data = data_collector.collect("T", RK3_start)
+	Tp_initial = coupled(NormalData(O_initial_data, BC_collecctor.collect("T", RK3_start), level_determine(tp_initial_data), wd))
+	Tp_perturb_data 	 = Tp_initial.getData() - Tp.getData()
+	gp_initial_data = data_collector.collect("PH", RK3_start)
+	gp_initial= coupled(NormalData(gp_initial_data, BC_collecctor.collect("PH", RK3_start), level_determine(gp_initial_data), wd))
+	gp_perturb_data 	 = gp_perturb.getData() - gp_pfr.getData()
+	gp_perturb = ConstData(gp_perturb_data, level_determine(gp_perturb_data), wd)
+	mdry_initial_data = data_collector.collect("MU", RK3_start ) 
+	mdry_initial = coupled(NormalData(mdry_initial_data, BC_collecctor.collect("MU", RK3_start), level_determine(mdry_initial_data), wd))
+	Mdry_perturb_data = mdry_initial.getData() 0- Mdry_pfr.getData()
+	Mdry_perturb = ConstData(Mdry_perturb_data, level_determine(Mdry_perturb_data), wd)
+	Ddry_perturb_data = -(gp_perturb.spatial(0).getData() + Ddry.getData() *Mdry_perturb.getData())/Mdry.getData()
+	p_perturb_data 	 = cs_sqr()/Ddry.getData() *(Tp_perturb_data/Tp.getData() - Ddry_perturb_data/Ddry.getData() - Mdry_perturb_data/Mdry.getData())
 
-	Output("U_perturb", U_perturb, RK3_start )
-	Output("V_perturb", V_perturb, RK3_start )
-	Output("W_perturb", W_perturb, RK3_start )
-	Output("O_perturb", O_perturb, RK3_start )
-	Output("Mdry_perturb", Mdry_perturb, RK3_start )
-	Output("Tp_perturb", Tp_perturb, RK3_start )
-	Output("gp_perturb", gp_perturb, RK3_start )
-	Output("Ddry_perturb", Ddry_perturb, RK3_start )
+	Output("U_perturb", U_perturb_data, RK3_start )
+	Output("V_perturb", V_perturb_data, RK3_start )
+	Output("W_perturb", W_perturb_data, RK3_start )
+	Output("O_perturb", O_perturb_data, RK3_start )
+	Output("Mdry_perturb", Mdry_perturb_data, RK3_start )
+	Output("Tp_perturb", Tp_perturb_data, RK3_start )
+	Output("gp_perturb", gp_perturb_data, RK3_start )
+	Output("Ddry_perturb", Ddry_perturb_data, RK3_start )
 	Output("p_perturb", p_perturb_data, RK3_start)
 
 
@@ -449,37 +465,37 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 		gp_perturb = NormalData(data_collector.collect("gp_perturb", acoustic_start))
 		p_perturb = NormalData(data_collector.collect("p_perturb", acoustic_start))
 		mdry_perturb = NormalData(data_collector.collect("Mdry_perturb", acoustic_start))
-		U_perturb_data = U_perturb + Step_acoustic*
+		U_perturb_data = U_perturb_data + Step_acoustic*
 		( U_S - 
-			((mapFactorM/mapFactorM)*(D/Ddry)*(
-				Mdry*(Ddry*p_perturb.spatial(2).getData()+Spatial(p_refer,2)*ddry_perturb.getData()+gp_perturb.spatial(2).getData())
-				+Spatial(gp, 2)*(p_perturb.spatial(0).getData()-mdry_perturb.getData()))
+			((mapFactorM.getData() / mapFactorM.getData())*(D.getData() / Ddry.getData())*(
+				Mdry.getData() *(Ddry.getData() * p_perturb.spatial(2).getData()+ p_refer.spatial(2).getData() * ddry_perturb.getData()+gp_perturb.spatial(2).getData())
+				+gp.spatial(2).getData() * (p_perturb.spatial(0).getData()-mdry_perturb.getData()))
 			)
 		)
 		U_perturb = NormalData(U_perturb_data)
-		V_perturb_data = V_perturb + Step_acoustic*
+		V_perturb_data = V_perturb_data + Step_acoustic*
 		(V_S - 
-			((mapFactorM/mapFactorM)*(D/Ddry)*(
+			((mapFactorM.getData() / mapFactorM.getData())*(D.getData() / Ddry.getData())*(
 				Mdry.getData() *(Ddry.getData() *p_perturb.spatial(1).getData() + p_refer.spatial(1).getData() * ddry_perturb.getData() + gp_perturb.spatial(1).getData())
 				+gp.spatial(1).getData() * (p_perturb.spatial(0).getData() - mdry_perturb.getData()))
 			)
 		)
 		V_perturb = NormalData(V_perturb_data)
-		Mdry_perturb_difference = mapFactorM*mapFactorM*Vert_Integrat(Spatial(U_perturb, 2) + Spatial(V_perturb, 1))
+		Mdry_perturb_difference = mapFactorM.getData() * mapFactorM.getData() * Vert_Integrat(U_perturb.spatial(2).getData() + V_perturb.spatial(1).getData())
 		
-		Mdry_perturb_data = Mdry_perturb.getData() + Step_acoustic*Mdry_perturb_difference 		  
-		O_perturb_data = Grad_Interp(Mdry_S - Mdry_perturb_difference - mapFactorM*mapFactorM*(U_perturb.spatial(2).getData()  + V_perturb.spatial(1).getData()))/mapFactorM
+		Mdry_perturb_data = Mdry_perturb.getData() + Step_acoustic * Mdry_perturb_difference 		  
+		O_perturb_data = Grad_Interp(Mdry_S.getData() - Mdry_perturb_difference - mapFactorM.getData() * mapFactorM.getData() *(U_perturb.spatial(2).getData()  + V_perturb.spatial(1).getData()))/mapFactorM.getData()
 		U_perturb_tp = NormalData(U_perturb.getData() * tp.getData())
 		V_perturb_tp = NormalData(V_perturb.getData() * tp.getData())
 		O_perturb_tp = NormalData(O_perturb_data * tp.getData())
-		Tp_perturb = Tp_perturb + Step_acoustic*(Tp_S - (mapFactorM*mapFactorM*(U_perturb_tp.spatial(2).getData() + V_perturb_tp.spatial(1).getData())+mapFactorM* O_perturb_tp.spatial(0).getData()))
+		Tp_perturb = Tp_perturb + Step_acoustic*(Tp_S - (mapFactorM.getData() *mapFactorM.getData() *(U_perturb_tp.spatial(2).getData() + V_perturb_tp.spatial(1).getData())+ mapFactorM.getData() * O_perturb_tp.spatial(0).getData()))
 		 
 
-		W_perturb = W_perturb + Step_acoustic*(W_S  + g/mapFactorM*(D/Ddry)*(p_perturb.spatial(0).getData() - timeAvg("Mdry_perturb", Mdry_perturb_data, acoustic start, Step_acoustic)))
-		gp_perturb = gp_perturb + Step_acoustic*(gp_S - mapFactorM*( O_perturb_data * gp.spatial(0).getData() - g*timeAvg("W_perturb", W_perturb.getData(), acoustic start, Step_acoustic))/Mdry)
+		W_perturb = W_perturb + Step_acoustic*(W_S  + g/mapFactorM.getData() * (D.getData() / Ddry.getData())*(p_perturb.spatial(0).getData() - timeAvg("Mdry_perturb", Mdry_perturb_data, acoustic start, Step_acoustic)))
+		gp_perturb = gp_perturb + Step_acoustic*(gp_S - mapFactorM.getData() *  (O_perturb_data * gp.spatial(0).getData() - g*timeAvg("W_perturb", W_perturb.getData(), acoustic start, Step_acoustic))/Mdry.getData())
 		 
 		#diagnostic equation
-		C = cs_sqr()/Mdry_perturb/Ddry^2
+		C = cs_sqr()/Mdry_perturb.getData() / Ddry.getData()^2
 		Ddry_perturb_data = -(gp_perturb.spatial(0).getData() + Ddry.getData() * Mdry_perturb_data)/Mdry.getData()
 		p_perturb = cs_sqr()/Ddry.getData() *(Tp_perturb/Tp - Ddry_perturb_data/Ddry.getData() - Mdry_perturb_data/Mdry.getData())
 
@@ -495,21 +511,31 @@ def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
 		Output("Ddry_perturb", Ddry_perturb, acoustic_end)
 		Output("p_perturb", p_perturb, acoustic_end)
 
-	U 		 = coupled(data_collector.collect("U", RK3_start )) - U_perturb		
-	V 		 = coupled(data_collector.collect("V", RK3_start )) - V_perturb		
-	W 		 = coupled(data_collector.collect("W", RK3_start )) - W_perturb		
-	O 		 = coupled(data_collector.collect("O", RK3_start )) - O_perturb		
-	Tp 		 = coupled(data_collector.collect("T", RK3_start )) - Tp_perturb		
-	Mdry_pfr = data_collector.collect("PH", RK3_start ) 		- Mdry_perturb  	
-	gp_pfr 	 = data_collector.collect("PH", RK3_start ) 		- gp_perturb 		
-	Mdry 	 = Mdry_pfr + Mdry_refer
-	gp 		 = gp_pfr 	+ gp_refer
+	U_data = data_collector.collect("U", RK3_start )
+	U_coupled = coupled(NormalData(U_data, BC_collecctor.collect("U", RK3_start), level_determine(U_data), wd))
+	U 		 = U_coupled.getData() - U_perturb.getData()	
+	V_data = data_collector.collect("V", RK3_start )
+	V_coupled = coupled(NormalData(V_data, BC_collecctor.collect("V", RK3_start), level_determine(V_data), wd))
+	V		 = V_coupled.getData() - V_perturb.getData()	
+	W_data = data_collector.collect("W", RK3_start )
+	W_coupled = coupled(NormalData(W_data, BC_collecctor.collect("W", RK3_start), level_determine(W_data), wd))
+	W		 = W_coupled.getData() - W_perturb.getData()
+	O_data = data_collector.collect("O", RK3_start )
+	V_coupled = coupled(NormalData(O_data, BC_collecctor.collect("O", RK3_start), level_determine(O_data), wd))
+	O		 = O_coupled.getData() - O_perturb.getData()
+	Tp_data = data_collector.collect("Tp", RK3_start )
+	Tp_coupled = coupled(NormalData(Tp_data, BC_collecctor.collect("Tp", RK3_start), level_determine(Tp_data), wd))
+	Tp		 = Tp_coupled.getData() - Tp_perturb.getData()			
+	Mdry_pfr = data_collector.collect("PH", RK3_start ) 		- Mdry_perturb.getData()	
+	gp_pfr 	 = data_collector.collect("PH", RK3_start ) 		- gp_perturb.getData()		
+	Mdry 	 = Mdry_pfr + Mdry_refer.getData()
+	gp 		 = gp_pfr 	+ gp_refer.getData()
 
-	Output("U",	uncouple(U), acoustic_end)
-	Output("V", uncouple(V), acoustic_end)
-	Output("W", uncouple(W), acoustic_end)
-	Output("O", uncouple(O), acoustic_end)
-	Output("T", uncouple(Tp), acoustic_end)
+	Output("U",	uncouple(NormalData(U, BC_collecctor.collect("U", RK3_start), level_determine(U), wd)), acoustic_end)
+	Output("V", uncouple(NormalData(V, BC_collecctor.collect("V", RK3_start), level_determine(V), wd)), acoustic_end)
+	Output("W", uncouple(NormalData(W, BC_collecctor.collect("W", RK3_start), level_determine(W), wd)), acoustic_end)
+	Output("O", uncouple(NormalData(O, BC_collecctor.collect("O", RK3_start), level_determine(O), wd)), acoustic_end)
+	Output("T", uncouple(NormalData(Tp, BC_collecctor.collect("Tp", RK3_start), level_determine(Tp), wd)), acoustic_end)
 	Output("MU", Mdry_pfr, acoustic_end)
 	Output("PH", gp_pfr, acoustic_end)
 
@@ -519,9 +545,9 @@ def prepare():
 	idxW		= data_collector.collect("ZNW", t_now)
 	lat 		= data_collector.collect("XLAT", t_now)
 	lon 		= data_collector.collect("XLONG", t_now)
-	mapFactorM  = data_collector.collect("MAPFAC_M", t_now)
-	mapFactorU  = data_collector.collect("MAPFAC_U", t_now)
-	mapFactorV  = data_collector.collect("MAPFAC_V", t_now)
+	mapFactorM  = NormalData(data_collector.collect("MAPFAC_M", t_now)))
+	mapFactorU  = NormalData(data_collector.collect("MAPFAC_U", t_now))
+	mapFactorV  = NormalData(data_collector.collect("MAPFAC_V", t_now))
 	wdK 		= data_collector.collect("DN", t_now)
 	wdW 		= data_collector.collect("DNW", t_now)
 	wd 			= (wdK, wdY, wdK)
@@ -536,14 +562,14 @@ def prepare():
 	T0 			= data_collector.collect("T00", t_now)
 	A  			= data_collector.collect("TLP", t_now)
 	#reference state
-	p_refer 	= data_collector.collect("PB", t_now)
+	p_refer 	= NormalData(data_collector.collect("PB", t_now))
 	gp_refer 	= data_collector.collect("PHB", t_now)
-	Mdry_refer 	= data_collector.collect("MUB", t_now)
+	Mdry_refer 	= ConstData(data_collector.collect("MUB", t_now))
 	Ddry_refer 	= Ddry_reference()
 	#perturbaton state from referenvce
-	p_pfr 		= data_collector.collect("P", t_now)
-	gp_pfr 		= data_collector.collect("PH", t_now)
-	Mdry_pfr 	= data_collector.collect("MU", t_now)
+	p_pfr 		= NormalData(data_collector.collect("P", t_now))
+	gp_pfr 		= NormalData(data_collector.collect("PH", t_now))
+	Mdry_pfr 	= NormalData(data_collector.collect("MU", t_now))
 	Ddry_pfr 	= Dd()
 	# features participating in RK advance 
 	u 			= data_collector.collect("U", t_now)
@@ -607,12 +633,18 @@ def main():
 			if i == 3:
 				n = 1, Step_acoustic = Step_RK3/3
 
-				U_tend    = Adv("U")   +Fcor("U")
-				V_tend    = Adv("V")   +Fcor("V")
-				W_tend    = Adv("W")   +Fcor("W")
-				Tp_tend   = Adv("Tp")  +Fcor("Tp")
-				gp_tend   = Adv("gp")  +Fcor("gp")
-				Mdry_tend = Adv("Mdry")+Fcor("Mdry")
+				U_tend_data    = Adv("U")   +Fcor("U")
+				U_tend = ConstData(U_tend_data, level_determine(U_tend_data), wd)
+				V_tend_data    = Adv("V")   +Fcor("V")
+				V_tend = ConstData(V_tend_data, level_determine(V_tend_data), wd)
+				W_tend_data    = Adv("W")   +Fcor("W")
+				W_tend = = ConstData(W_tend_data, level_determine(W_tend_data), wd)
+				Tp_tend_data   = Adv("Tp")  +Fcor("Tp")
+				Tp_tend = ConstData(Tp_tend_data, level_determine(Tp_tend_data), wd)
+				gp_tend_data   = Adv("gp")  +Fcor("gp")
+				gp_tend = ConstData(gp_tend_data, level_determine(gp_tend_data), wd)
+				Mdry_tend_data = Adv("Mdry")+Fcor("Mdry")
+				Mdry_tend = ConstData(Mdry_tend_data, level_determine(Mdry_tend_data), wd)
 				
 			else:
 				n = ns/i, Step_acoustic = Step_RK3/ns

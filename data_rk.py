@@ -5,6 +5,7 @@ class AbstractData:
 	def __init__(self, data):
 		self._data = data
 
+	@property
 	def getData(self):
 		return self._data
 	
@@ -17,6 +18,8 @@ class NormalData(AbstractData):
 		self._boundary_data = boundary_data
 		self._level = level
 		self._wd = wd
+		
+	@property
 	def level(self):
 		return self._level 
 
