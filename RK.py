@@ -5,40 +5,38 @@ from data_rk import NormalData
 #Initialization
 data_collector 		= AirDynamicData("climate2014-01.nc")
 BC_collecctor 		=  AirDynamicData("wrfbdy_d01")
-
-t_start 			= datetime.datetime() 
-t_end 				= datetime.datetime()
-t_now 				= t_start
-RK3_start 			= None
-RK3_end				= None
-acoustic_start 		= None
-acoustic_end 		= None
-n 					= None
-ns 					= None
-Step 				= datetime.timedelta(seconds = ) # coorelated to interval seconds in wrf namelist
-Step_RK3 			= datetime.timedelta(seconds = ) # 6*wdX sec is suggested
-Step_acoustic		= None
-
-wdX					= 1100
-wdY 				= 1100
-wdK 				= None
-wd 					= None
+#user define
+t_start 			= datetime.datetime(2016, 8, 14, 0, 0, 0) 
+t_end 				= datetime.datetime(2016, 8, 14, 6, 0, 0)
+Step 				= datetime.timedelta(seconds = 3600*6) # coorelated to interval seconds in wrf namelist
+wdX					= 11 #kilometer
+wdY 				= 11 #kilometer
 nX 					= 200
 nY   				= 300
-nK					= 31 "equals to the numbers of vertical isobaric layers from global model"
+nK					= 31 #equals to the numbers of vertical isobaric layers from global model
 num_bdy_layer 		= 1
 
+wdK 				= None
+wd 					= None
 idxK 				= None,
 idxW 				= None,
 lat 				= None,
 lon 				= None,
 
+t_now 				= t_start
+RK3_start 			= None
+RK3_end				= None
+Step_RK3 			= datetime.timedelta(seconds = 6) # 6*wdX sec is suggested
+acoustic_start 		= None
+acoustic_end 		= None
+Step_acoustic		= None
+n 					= None
+ns 					= 8
 
 p_dry_top = None,
 p0 = None#pa
 T0 = None #K, mean sea level temp
 A = None #K, difference between p0 and p0/e
-p_sd"grid"
 gp_surface
 
 g = 9.81
@@ -129,11 +127,6 @@ def gp_reference():
 	gpr = Grad_Interp(gp_reference_grad(), 0)
 
 #perturbation state from reference
-def Md():
-	global p_sd
-	dry_mass = p_sd - p_dry_surface()
-	return dry_mass
-
 def Dd():
 	global Rd, Rv, p0, tp, p_pfr, p_refer
 	dry_density = Rd/p0*tp*(1+Rv/Rd*qv)*(p_pfr + p_refer/p0)^(-cv()/cp())
@@ -416,7 +409,7 @@ def ModeS(var, tend):
 
 
 def acoustic_time_integration(var_S, n, RK3_start, Step_acoustic):
-	global mapFactorM, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, p, p_refer, gp_refer, Mdry_refer, Ddry_refer, p_pfr, gp_pfr, Mdry_pfr, Ddry_pfr 
+	global acoustic_start, acoustic_end, Step_acoustic, RK3_start, mapFactorM, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, p, p_refer, gp_refer, Mdry_refer, Ddry_refer, p_pfr, gp_pfr, Mdry_pfr, Ddry_pfr 
 
 	U_S = var_S[0], V_S = var_S[1], W_S = var_S[2],
 	Mdry_S = var_S[3], Tp_S = var_S[4], gp_S = var_S[5]
@@ -622,10 +615,10 @@ def BC(name, axis, pos, tend_opt):
 
 #Runge-Kutta Step	main-loop
 def main():
-	global mapFactorM, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, qm, p, p_refer, gp_refer, Mdry_refer, Ddry_refer, p_pfr, gp_pfr, Mdry_pfr, Ddry_pfr 
+	global t_now, t_start, t_end, RK3_start, RK3_end, Step_RK3, Step_acoustic, n, ns, mapFactorM, U, V, O, gp, D, Ddry, Mdry, g, W, qc, qr, qv, qm, p, p_refer, gp_refer, Mdry_refer, Ddry_refer, p_pfr, gp_pfr, Mdry_pfr, Ddry_pfr 
 
-	for t in range(0, (t_end-t_start)/Step): 
-		t_now = t_start + t*Step
+	for t in range(0, (t_end-t_start)/Step_RK3): 
+		t_now = t_start + t*Step_RK3
 			
 		for i in range(3,0,-1):
 			RK3_start = t_now
