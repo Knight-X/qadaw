@@ -33,41 +33,64 @@ Step_acoustic		= None
 n 					= None
 ns 					= 8
 
-p_dry_top = None,
-p0 = None#pa
-T0 = None #K, mean sea level temp
-A = None #K, difference between p0 and p0/e
-gp_surface
+p_sd		= None, 
+p_dry_top   = None,
+p0 			= None#pa
+T0 			= None #K, mean sea level temp
+A 			= None #K, difference between p0 and p0/e
 
-g = 9.81
-Rd = 287 #J/kg/K
-Rv = 461.6 #J/kg/K
-rEarth = 6.307*10^6 #meter
-Beta = 0.1
-e = None 
-f = None 
-sinalpha = None 
-cosalpha = None
-MW_wv = "molecular weight of water vapor"
-MW_dry = "molecular weight of dry air"
-epcilon = MW_wv/MW_dry
+g 			= 9.81
+Rd 			= 287 #J/kg/K
+Rv 			= 461.6 #J/kg/K
+rEarth 		= 6.307*10^6 #meter
+Beta 		= 0.1
+e 			= None 
+f 			= None 
+sinalpha 	= None 
+cosalpha 	= None
 
 #input from wrfd01
-mapFactorM = None,
-mapFactorU = None,
-mapFactorV = None,
+mapFactorM 	= None,
+mapFactorU 	= None,
+mapFactorV 	= None,
 
+p_refer 	= None, 
+gp_refer 	= None, 
+Mdry_refer 	= None, 
+Ddry_refer 	= None,
 
-p_refer = None, gp_refer = None, Mdry_refer = None, Ddry_refer = None,
-p_pfr   = None, gp_pfr   = None, Mdry_pfr   = None, Ddry_pfr   = None,
+p_pfr   	= None, 
+gp_pfr   	= None, 
+Mdry_pfr   	= None, 
+Ddry_pfr   	= None,
 
-u  = None, v  = None, w    = None, o  = None, tp   = None,
-gp = None, p  = None, Mdry = None, D  = None, Ddry = None,
-qv = None, qc = None, qr   = None, qi = None, qm   = None,
+u  			= None, 
+v  			= None, 
+w    		= None, 
+o 			= None, 
+tp  		= None,
+p  			= None,
+gp 			= None, 
+Mdry 		= None, 
+Ddry 		= None,
+D  			= None, 
+qv 			= None, 
+qc 			= None, 
+qr   		= None, 
+qi 			= None, 
+qm   		= None,
 
 #coupled
-cplst = ["U","V","W","O","Tp","Qm"]
-U = None, V = None, W = None, O = None, Tp = None, Qv = None, Qc = None, Qr = None, Qi = None, Qm = None
+U 			= None, 
+V			= None, 
+W			= None, 
+O 			= None, 
+Tp 			= None, 
+Qv 			= None, 
+Qc 			= None, 
+Qr 			= None, 
+Qi 			= None, 
+Qm 			= None,
 
 
 #reference state
@@ -119,30 +142,15 @@ def Mdry_reference():
 	Mdr = p_dry_surface()-p_dry_top
 	return Mdr
 
-def gp_reference_grad():
-	grad = Ddry_reference()*Mdry_reference()
-	return grad
-
-def gp_reference():
-	gpr = Grad_Interp(gp_reference_grad(), 0)
-
 #perturbation state from reference
 def Dd():
-	global Rd, Rv, p0, tp, p_pfr, p_refer
+	global Rd, Rv, p0, qv, tp, p_pfr, p_refer
 	dry_density = Rd/p0*tp*(1+Rv/Rd*qv)*(p_pfr + p_refer/p0)^(-cv()/cp())
 	return dry_density
 
 def Ddry_perturb_from_refer():
 	Dd_pfr = Dd() - Ddry_reference()
 	return Dd_pfr
-
-def gp_perturb_from_refer_grad():
-	grad = -(Md()*Ddry_perturb_from_refer()+Mdry_perturb_from_refer()*Ddry_reference())
-	return grad
-
-def gp_perturb_from_refer ():
-	gp_pfr = Grad_Interp(gp_perturb_from_refer_grad(), 0)
-	return gp_pfr 
 
 #diagnostic eq
 def tp_moist():
@@ -518,6 +526,7 @@ def prepare():
 	sinalpha 	= data_collector.collect("SINALPHA", t_now)
 	cosplpha 	= data_collector.collect("COSALPHA", t_now)
 	#base state
+	p_sd		= data_collector.collect("PSFC", t_now)
 	p_dry_top 	= data_collector.collect("P_TOP", t_now)
 	p0 			= data_collector.collect("P00", t_now)
 	T0 			= data_collector.collect("T00", t_now)
@@ -531,17 +540,17 @@ def prepare():
 	p_pfr 		= data_collector.collect("P", t_now)
 	gp_pfr 		= data_collector.collect("PH", t_now)
 	Mdry_pfr 	= data_collector.collect("MU", t_now)
-	Ddry_pfr 	= Dd()
+	Ddry_pfr 	= Ddry_perturb_from_refer()
 	# features participating in RK advance 
 	u 			= data_collector.collect("U", t_now)
 	v 			= data_collector.collect("V", t_now)
 	w 			= data_collector.collect("W", t_now)
 	o 			= 
 	output("O", o, t_now)
-	tp 			= data_collector.collect("T",t_now)	
+	tp 			= data_collector.collect("T",t_now)
 	qv 			= data_collector.collect("QVAPOR", t_now)
 	qc 			= data_collector.collect("QCLOUD", t_now)
-	qr 			= data_collector.collect("QRAIN", t_now) 
+	qr 			= data_collector.collect("QRAIN", t_now)
 	qi 			= data_collector.collect("QICE", t_now)
 	qm 			= qv+qc+qr+qi
 	output("Qm", qm, t_now)
